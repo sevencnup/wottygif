@@ -1,0 +1,192 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #eef2f7;
+  color: #162033;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.workspace {
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #53657d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: clamp(28px, 5vw, 48px);
+  line-height: 1.05;
+}
+
+h2 {
+  font-size: 20px;
+}
+
+.status {
+  min-width: 86px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #d7dee9;
+  color: #334155;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.status.ok {
+  background: #d9fbe7;
+  color: #126239;
+}
+
+.status.offline {
+  background: #ffe1e1;
+  color: #9f1d1d;
+}
+
+.job-panel {
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  gap: 12px;
+  align-items: end;
+  padding: 18px;
+  border: 1px solid #d8e0ec;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #526174;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+input,
+select {
+  height: 42px;
+  border: 1px solid #ccd6e3;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #162033;
+  background: #ffffff;
+}
+
+button {
+  height: 42px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 18px;
+  color: #ffffff;
+  background: #1e5eff;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #9f1d1d;
+  font-weight: 700;
+}
+
+.jobs {
+  margin-top: 22px;
+}
+
+.job-card,
+.empty {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid #d8e0ec;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.job-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.job-card div {
+  display: grid;
+  gap: 3px;
+}
+
+.job-card span,
+.empty {
+  color: #66768b;
+}
+
+.job-card em {
+  color: #1e5eff;
+  font-style: normal;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding: 18px;
+  }
+
+  .topbar,
+  .job-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .job-panel {
+    grid-template-columns: 1fr;
+  }
+}

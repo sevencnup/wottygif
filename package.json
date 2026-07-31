@@ -1,0 +1,9 @@
+{
+  "name": "wottygif",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "frontend:dev": "pnpm --filter wottygif-frontend dev",
+    "frontend:build": "pnpm --filter wottygif-frontend build"
+  }
+}

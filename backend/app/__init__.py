@@ -1,0 +1,1 @@
+"""WottyGIF backend package."""
