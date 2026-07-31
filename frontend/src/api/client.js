@@ -1,19 +1,43 @@
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 const request = async (path, options = {}) => {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    },
-    ...options
-  })
+  let response
 
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`)
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      ...options
+    })
+  } catch (error) {
+    throw new Error('无法连接后端服务，请先启动 FastAPI。')
   }
 
-  return response.json()
+  let data = null
+  const contentType = response.headers.get('content-type') || ''
+
+  if (contentType.includes('application/json')) {
+    data = await response.json()
+  } else {
+    data = await response.text()
+  }
+
+  if (!response.ok) {
+    const detail =
+      typeof data === 'string'
+        ? data
+        : data?.detail
+          ? Array.isArray(data.detail)
+            ? data.detail.map((item) => item.msg || String(item)).join('; ')
+            : data.detail
+          : `Request failed: ${response.status}`
+
+    throw new Error(detail)
+  }
+
+  return data
 }
 
 export const getHealth = () => request('/api/health')
