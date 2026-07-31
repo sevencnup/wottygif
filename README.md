@@ -1,6 +1,6 @@
 # WottyGIF
 
-WottyGIF is being rebuilt as a Python backend plus Vue frontend media studio.
+WottyGIF is a local Python and Vue media studio that generates downloadable GIF files.
 
 ## Current Scope
 
@@ -9,12 +9,15 @@ WottyGIF is being rebuilt as a Python backend plus Vue frontend media studio.
 - Three production modes:
   - `single_image`: batch-generate one result per image
   - `multi_image`: combine multiple images into one result
-  - `video`: send video assets into the video creation queue
-- In-memory job queue for frontend and backend workflow verification
+  - `video`: convert video assets into GIF files
+- Real GIF generation with result preview and download
+- Compact responsive workspace tuned for desktop and mobile use
 
 ## Stack
 
 - Backend: FastAPI
+- Image processing: Pillow
+- Video processing: FFmpeg
 - Frontend: Vue 3 + Vite
 
 ## Development
@@ -38,15 +41,18 @@ pnpm --filter wottygif-frontend dev
 
 ## API Notes
 
-`POST /api/media/jobs` now accepts:
+`POST /api/media/jobs` accepts `multipart/form-data`:
 
 - `mode`: `single_image` | `multi_image` | `video`
 - `quality`: integer `1` to `5`
-- `assets`: a list of asset metadata objects
+- `origins`: one value per file (`paste` or `upload`)
+- `files`: the real image or video files
+
+Completed jobs expose `GET /api/media/jobs/{job_id}/result` for GIF preview and download. Generated files are stored under `backend/data/results` and are ignored by Git.
 
 ## Version
 
-Current version: `0.2.4`
+Current version: `0.3.0`
 
 ## One Command Dev Start
 

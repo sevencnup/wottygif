@@ -7,3 +7,4 @@ node_modules/
 .env
 frontend-dev*.log
 backend-dev*.log
+backend/data/

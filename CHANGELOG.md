@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 - 2026-07-31
+
+- Replaced metadata-only queue submission with real multipart media uploads.
+- Added Pillow-based single-image and multi-image GIF generation.
+- Added FFmpeg-based video-to-GIF generation with five quality presets.
+- Added completed and failed job states, persisted result files, and a GIF result endpoint.
+- Added GIF previews, Chinese status labels, failure details, and downloads to the responsive frontend.
+- Added backend generation regression tests and restored `WEB_MEDIA_GENERATION.md`.
+
+## 0.2.5 - 2026-07-31
+
+- Reworked the workspace into a flatter, cleaner UI without large gradients or heavy borders.
+- Improved the mobile layout with horizontally scrollable mode selection and a shared preview/queue stage.
+- Kept key actions, summaries, and status visible in a tighter first-screen composition on smaller devices.
+
 ## 0.2.4 - 2026-07-31
 
 - Restored Python 3.10 compatibility by replacing the Python 3.11-only `StrEnum` dependency.

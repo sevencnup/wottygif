@@ -1,26 +1,31 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { createMediaJob, getHealth, listMediaJobs } from './api/client.js'
+import { createMediaJob, getHealth, listMediaJobs, resolveApiUrl } from './api/client.js'
 
 const MODE_OPTIONS = [
   {
     value: 'single_image',
     label: '单图模式',
-    hint: '整页粘贴图片后，每张图都会单独创建一个任务。',
+    hint: '每张图片单独创建任务。',
     accept: 'image/*'
   },
   {
     value: 'multi_image',
     label: '多图模式',
-    hint: '多张图片合成一个结果，至少需要 2 张图。',
+    hint: '多张图片合成一个结果。',
     accept: 'image/*'
   },
   {
     value: 'video',
     label: '视频制作',
-    hint: '导入视频素材后进入视频制作队列。',
+    hint: '视频素材进入制作队列。',
     accept: 'video/*'
   }
+]
+
+const PANEL_TABS = [
+  { value: 'assets', label: '素材' },
+  { value: 'jobs', label: '队列' }
 ]
 
 const health = ref('checking')
@@ -32,7 +37,9 @@ const isSubmitting = ref(false)
 const errorMessage = ref('')
 const queueMessage = ref('')
 const fileInput = ref(null)
+const mobilePanel = ref('assets')
 let assetSequence = 0
+let jobsRefreshTimer = null
 
 const modeMeta = computed(
   () => MODE_OPTIONS.find((option) => option.value === mode.value) ?? MODE_OPTIONS[0]
@@ -52,31 +59,31 @@ const totalSizeLabel = computed(() => {
 
 const queueSummary = computed(() => {
   if (!assets.value.length) {
-    return '整页都可以直接 Ctrl+V 粘贴素材，也可以拖入或手动选择。'
+    return '等待素材'
   }
 
   if (mode.value === 'single_image') {
-    return `将为 ${assets.value.length} 张图片分别创建单图任务。`
+    return `${assets.value.length} 张单独提交`
   }
 
   if (mode.value === 'multi_image') {
-    return `将把 ${assets.value.length} 张图片合成为一个多图任务。`
+    return `${assets.value.length} 张合成 1 个任务`
   }
 
-  return `将提交 ${assets.value.length} 个视频素材进入视频制作流程。`
+  return `${assets.value.length} 个视频待提交`
 })
 
 const submitHint = computed(() => {
   if (health.value === 'offline') {
-    return '后端当前离线，按钮可以点，但提交会失败。'
+    return '后端未连接，提交会失败。'
   }
   if (mode.value === 'multi_image' && assets.value.length < 2) {
     return '多图模式至少需要 2 张图片。'
   }
   if (!assets.value.length) {
-    return '先粘贴、拖入，或者选择素材。'
+    return '先加入素材。'
   }
-  return '素材已就绪，可以直接创建任务。'
+  return '可以直接生成 GIF。'
 })
 
 const cleanupAssetUrl = (asset) => {
@@ -148,6 +155,7 @@ const addFiles = (files, origin) => {
 
   assets.value = [...assets.value, ...nextAssets]
   queueMessage.value = ''
+  mobilePanel.value = 'assets'
 
   if (rejected.length) {
     errorMessage.value = `已跳过不匹配模式的素材: ${rejected.join(', ')}`
@@ -234,13 +242,7 @@ const applyModeRules = (nextMode) => {
 const createPayloadForAssets = (selectedAssets) => ({
   mode: mode.value,
   quality: quality.value,
-  assets: selectedAssets.map((asset) => ({
-    name: asset.name,
-    kind: asset.kind,
-    origin: asset.origin,
-    mime_type: asset.mime_type,
-    size_bytes: asset.size_bytes
-  }))
+  assets: selectedAssets
 })
 
 const submitJob = async () => {
@@ -256,20 +258,29 @@ const submitJob = async () => {
   isSubmitting.value = true
 
   try {
-    if (mode.value === 'single_image') {
-      await Promise.all(assets.value.map((asset) => createMediaJob(createPayloadForAssets([asset]))))
-      queueMessage.value = `已创建 ${assets.value.length} 个单图任务。`
+    let createdJobs
+    if (mode.value === 'single_image' || mode.value === 'video') {
+      createdJobs = await Promise.all(
+        assets.value.map((asset) => createMediaJob(createPayloadForAssets([asset])))
+      )
     } else {
-      await createMediaJob(createPayloadForAssets(assets.value))
-      queueMessage.value =
-        mode.value === 'multi_image' ? '多图任务已经进入队列。' : '视频任务已经进入队列。'
+      createdJobs = [await createMediaJob(createPayloadForAssets(assets.value))]
     }
 
-    resetAssets({ clearMessage: false })
     await refreshJobs()
+    const failedJob = createdJobs.find((job) => job.status === 'failed')
+    if (failedJob) {
+      throw new Error(failedJob.error_message || '生成失败，请查看任务状态。')
+    }
+
+    queueMessage.value = `已生成 ${createdJobs.length} 个 GIF 成品。`
+    resetAssets({ clearMessage: false })
     await checkHealth()
+    mobilePanel.value = 'jobs'
   } catch (error) {
     errorMessage.value = error.message
+    await refreshJobs()
+    mobilePanel.value = 'jobs'
   } finally {
     isSubmitting.value = false
   }
@@ -289,14 +300,30 @@ const formatJobMode = (jobMode) => {
   return MODE_OPTIONS.find((item) => item.value === jobMode)?.label ?? jobMode
 }
 
+const formatJobStatus = (status) =>
+  ({
+    queued: '等待中',
+    processing: '生成中',
+    completed: '已完成',
+    failed: '失败'
+  })[status] ?? status
+
 onMounted(async () => {
   window.addEventListener('paste', handleGlobalPaste)
   await checkHealth()
   await refreshJobs()
+  jobsRefreshTimer = window.setInterval(() => {
+    if (jobs.value.some((job) => ['queued', 'processing'].includes(job.status))) {
+      refreshJobs().catch(() => {})
+    }
+  }, 2000)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('paste', handleGlobalPaste)
+  if (jobsRefreshTimer) {
+    window.clearInterval(jobsRefreshTimer)
+  }
   assets.value.forEach(cleanupAssetUrl)
 })
 </script>
@@ -307,14 +334,28 @@ onBeforeUnmount(() => {
       <header class="hero">
         <div class="hero-copy">
           <p class="eyebrow">WottyGIF Studio</p>
-          <h1>媒体转 GIF 工作台</h1>
-          <p class="hero-note">
-            现在整页都能识别粘贴。选模式，贴素材，直接进队列。
-          </p>
+          <h1>媒体工作台</h1>
+          <p class="hero-note">粘贴图片或视频，直接生成、预览并下载 GIF。</p>
         </div>
         <div class="hero-side">
-          <span :class="['status', health]">{{ health }}</span>
-          <p class="mode-hint">{{ modeMeta.hint }}</p>
+          <div class="hero-status">
+            <span :class="['status', health]">{{ health }}</span>
+            <p class="mode-hint">{{ modeMeta.hint }}</p>
+          </div>
+          <div class="hero-metrics">
+            <div>
+              <span>模式</span>
+              <strong>{{ modeMeta.label }}</strong>
+            </div>
+            <div>
+              <span>素材</span>
+              <strong>{{ assets.length }} 个</strong>
+            </div>
+            <div>
+              <span>队列</span>
+              <strong>{{ jobs.length }} 条</strong>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -346,9 +387,9 @@ onBeforeUnmount(() => {
 
           <div class="paste-zone" tabindex="0">
             <div class="paste-copy">
-              <span class="paste-badge">全页识别</span>
+              <span class="paste-badge">全页粘贴</span>
               <h2>粘贴、拖入或选择素材</h2>
-              <p>不用点中特定区域，整页直接按 Ctrl+V 也会识别。</p>
+              <p>整页直接按 Ctrl+V 也会识别，不用先点输入框。</p>
             </div>
 
             <div class="paste-actions">
@@ -388,53 +429,87 @@ onBeforeUnmount(() => {
 
           <div class="submit-row">
             <button class="primary-button" type="submit" :disabled="isSubmitting">
-              {{ isSubmitting ? '提交中...' : '创建任务' }}
+              {{ isSubmitting ? '生成中...' : '开始生成' }}
             </button>
             <p class="submit-hint">{{ submitHint }}</p>
           </div>
         </form>
 
-        <section class="preview-panel">
-          <div class="panel-head">
-            <h2>素材预览</h2>
-            <span>{{ modeMeta.label }}</span>
+        <section class="side-stage">
+          <div class="mobile-panel-switch" role="tablist" aria-label="移动端面板切换">
+            <button
+              v-for="tab in PANEL_TABS"
+              :key="tab.value"
+              class="panel-tab"
+              :class="{ active: mobilePanel === tab.value }"
+              type="button"
+              @click="mobilePanel = tab.value"
+            >
+              {{ tab.label }}
+            </button>
           </div>
 
-          <div v-if="assets.length" class="asset-grid">
-            <article v-for="asset in assets" :key="asset.id" class="asset-card">
-              <div class="asset-preview">
-                <img v-if="asset.preview_url" :src="asset.preview_url" :alt="asset.name" />
-                <div v-else class="video-placeholder">VIDEO</div>
-              </div>
-              <div class="asset-meta">
-                <strong>{{ asset.name }}</strong>
-                <span>{{ asset.origin === 'paste' ? '粘贴' : '上传' }} · {{ formatBytes(asset.size_bytes) }}</span>
-              </div>
-              <button class="remove-button" type="button" @click="removeAsset(asset.id)">移除</button>
-            </article>
-          </div>
+          <section class="preview-panel" :class="{ mobileHidden: mobilePanel !== 'assets' }">
+            <div class="panel-head">
+              <h2>素材预览</h2>
+              <span>{{ modeMeta.label }}</span>
+            </div>
 
-          <div v-else class="empty-preview">
-            <p>这里会显示你刚刚粘贴或拖入的素材预览。</p>
-          </div>
+            <div v-if="assets.length" class="asset-grid">
+              <article v-for="asset in assets" :key="asset.id" class="asset-card">
+                <div class="asset-preview">
+                  <img v-if="asset.preview_url" :src="asset.preview_url" :alt="asset.name" />
+                  <div v-else class="video-placeholder">VIDEO</div>
+                </div>
+                <div class="asset-meta">
+                  <strong>{{ asset.name }}</strong>
+                  <span>{{ asset.origin === 'paste' ? '粘贴' : '上传' }} · {{ formatBytes(asset.size_bytes) }}</span>
+                </div>
+                <button class="remove-button" type="button" @click="removeAsset(asset.id)">移除</button>
+              </article>
+            </div>
+
+            <div v-else class="empty-preview">
+              <p>这里会显示刚加入的素材。</p>
+            </div>
+          </section>
+
+          <section class="jobs-panel" :class="{ mobileHidden: mobilePanel !== 'jobs' }">
+            <div class="panel-head">
+              <h2>任务队列</h2>
+              <span>{{ jobs.length }} 条</span>
+            </div>
+
+            <div v-if="jobs.length" class="job-list">
+              <article v-for="job in jobs" :key="job.id" class="job-card">
+                <img
+                  v-if="job.status === 'completed' && job.result_url"
+                  class="job-result-preview"
+                  :src="resolveApiUrl(job.result_url)"
+                  :alt="job.result_name"
+                />
+                <div class="job-main">
+                  <strong>{{ job.source_name }}</strong>
+                  <span>{{ formatJobMode(job.mode) }} · 质量 {{ job.quality }} · {{ job.asset_count }} 个素材</span>
+                  <span v-if="job.error_message" class="job-error">{{ job.error_message }}</span>
+                </div>
+                <div class="job-actions">
+                  <em :class="`job-status ${job.status}`">{{ formatJobStatus(job.status) }}</em>
+                  <a
+                    v-if="job.status === 'completed' && job.result_url"
+                    class="result-button"
+                    :href="resolveApiUrl(job.result_url)"
+                    :download="job.result_name"
+                  >
+                    下载 GIF
+                  </a>
+                </div>
+              </article>
+            </div>
+
+            <p v-else class="empty-jobs">暂无任务</p>
+          </section>
         </section>
-      </section>
-
-      <section class="jobs">
-        <div class="panel-head">
-          <h2>任务队列</h2>
-          <span>{{ jobs.length }} 条</span>
-        </div>
-
-        <article v-for="job in jobs" :key="job.id" class="job-card">
-          <div class="job-main">
-            <strong>{{ job.source_name }}</strong>
-            <span>{{ formatJobMode(job.mode) }} · 质量 {{ job.quality }} · {{ job.asset_count }} 个素材</span>
-          </div>
-          <em>{{ job.status }}</em>
-        </article>
-
-        <p v-if="jobs.length === 0" class="empty-jobs">暂无任务</p>
       </section>
     </section>
   </main>

@@ -1,10 +1,10 @@
 {
   "name": "wottygif",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "powershell -ExecutionPolicy Bypass -File .\\scripts\\dev.ps1",
-    "backend:dev": "backend\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
+    "backend:dev": "backend\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000",
     "frontend:dev": "pnpm --filter wottygif-frontend dev",
     "frontend:build": "pnpm --filter wottygif-frontend build"
   }

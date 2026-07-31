@@ -1,8 +1,10 @@
 # WottyGIF Backend
 
-Python FastAPI backend for media processing workflows.
+Python FastAPI backend for real image and video to GIF generation.
 
 Supported Python version: 3.10 or newer.
+
+Image conversion uses Pillow. Video conversion requires FFmpeg in `PATH`, or an explicit executable path in `WOTTYGIF_FFMPEG`.
 
 ## Run
 
@@ -36,8 +38,15 @@ Create job:
 POST http://127.0.0.1:8000/api/media/jobs
 ```
 
-Payload fields:
+Multipart fields:
 
 - `mode`: `single_image`, `multi_image`, `video`
 - `quality`: `1` to `5`
-- `assets`: media metadata list
+- `origins`: repeated `paste` or `upload` values
+- `files`: repeated image or video uploads
+
+Download a completed result:
+
+```text
+GET http://127.0.0.1:8000/api/media/jobs/{job_id}/result
+```

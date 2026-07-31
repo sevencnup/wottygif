@@ -4,12 +4,14 @@ const request = async (path, options = {}) => {
   let response
 
   try {
+    const headers = { ...options.headers }
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json'
+    }
+
     response = await fetch(`${API_BASE}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      ...options
+      ...options,
+      headers
     })
   } catch (error) {
     throw new Error('无法连接后端服务，请先启动 FastAPI。')
@@ -42,10 +44,21 @@ const request = async (path, options = {}) => {
 
 export const getHealth = () => request('/api/health')
 
-export const createMediaJob = (payload) =>
-  request('/api/media/jobs', {
-    method: 'POST',
-    body: JSON.stringify(payload)
+export const createMediaJob = ({ mode, quality, assets }) => {
+  const formData = new FormData()
+  formData.append('mode', mode)
+  formData.append('quality', String(quality))
+  assets.forEach((asset) => {
+    formData.append('origins', asset.origin)
+    formData.append('files', asset.file, asset.name)
   })
 
+  return request('/api/media/jobs', {
+    method: 'POST',
+    body: formData
+  })
+}
+
 export const listMediaJobs = () => request('/api/media/jobs')
+
+export const resolveApiUrl = (path) => `${API_BASE}${path}`
