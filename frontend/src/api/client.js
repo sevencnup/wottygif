@@ -1,10 +1,37 @@
 const API_BASE = import.meta.env.VITE_API_BASE || ''
+const DEVICE_STORAGE_KEY = 'wottygif-device-id'
+
+const createDeviceId = () => {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
+  }
+  return `device-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+const getDeviceId = () => {
+  try {
+    const savedId = window.localStorage.getItem(DEVICE_STORAGE_KEY)
+    if (savedId) {
+      return savedId
+    }
+    const nextId = createDeviceId()
+    window.localStorage.setItem(DEVICE_STORAGE_KEY, nextId)
+    return nextId
+  } catch {
+    return createDeviceId()
+  }
+}
+
+const DEVICE_ID = getDeviceId()
 
 const request = async (path, options = {}) => {
   let response
 
   try {
-    const headers = { ...options.headers }
+    const headers = {
+      'X-WottyGIF-Device-ID': DEVICE_ID,
+      ...options.headers
+    }
     if (!(options.body instanceof FormData)) {
       headers['Content-Type'] = 'application/json'
     }
@@ -71,4 +98,7 @@ export const createMediaJob = ({ mode, quality, assets, videoOptions = null, ima
 
 export const listMediaJobs = () => request('/api/media/jobs')
 
-export const resolveApiUrl = (path) => `${API_BASE}${path}`
+export const resolveApiUrl = (path) => {
+  const separator = path.includes('?') ? '&' : '?'
+  return `${API_BASE}${path}${separator}device_id=${encodeURIComponent(DEVICE_ID)}`
+}

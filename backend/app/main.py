@@ -4,6 +4,7 @@ import asyncio
 import os
 import json
 import logging
+import re
 import shutil
 import subprocess
 from contextlib import asynccontextmanager, suppress
@@ -15,7 +16,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from uuid import uuid4
 from zipfile import ZIP_STORED, ZipFile
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -85,7 +86,7 @@ class MediaJob(BaseModel):
     error_message: str | None = None
 
 
-app = FastAPI(title="WottyGIF API", version="0.3.26", lifespan=lifespan)
+app = FastAPI(title="WottyGIF API", version="0.3.27", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -107,6 +108,8 @@ MAX_ASSETS = 24
 MAX_VIDEO_SECONDS = 30.0
 RESULT_RETENTION = timedelta(hours=1)
 RESULT_CLEANUP_INTERVAL_SECONDS = 60
+LEGACY_DEVICE_ID = "legacy-unassigned"
+DEVICE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 QUALITY_SETTINGS = {
     1: {"max_side": 360, "colors": 128, "fps": 6, "kmeans": 0},
     2: {"max_side": 540, "colors": 160, "fps": 8, "kmeans": 1},
@@ -117,6 +120,15 @@ QUALITY_SETTINGS = {
 
 jobs: dict[str, MediaJob] = {}
 result_paths: dict[str, Path] = {}
+job_device_ids: dict[str, str] = {}
+
+
+def normalized_device_id(value: str | None) -> str:
+    if value is None:
+        return LEGACY_DEVICE_ID
+    if not DEVICE_ID_PATTERN.fullmatch(value):
+        raise HTTPException(status_code=400, detail="设备标识格式无效。")
+    return value
 
 
 def jobs_metadata_path() -> Path:
@@ -127,10 +139,11 @@ def persist_jobs() -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     metadata_path = jobs_metadata_path()
     temporary_path = metadata_path.with_name(f".{metadata_path.name}.{uuid4().hex}.tmp")
-    payload = [
-        job.model_dump(mode="json")
-        for job in sorted(jobs.values(), key=lambda item: item.created_at, reverse=True)
-    ]
+    payload = []
+    for job in sorted(jobs.values(), key=lambda item: item.created_at, reverse=True):
+        item = job.model_dump(mode="json")
+        item["_device_id"] = job_device_ids.get(job.id, LEGACY_DEVICE_ID)
+        payload.append(item)
     try:
         temporary_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         temporary_path.replace(metadata_path)
@@ -183,6 +196,7 @@ def cleanup_expired_results(
                     continue
 
         result_paths.pop(job_id, None)
+        job_device_ids.pop(job_id, None)
         jobs.pop(job_id, None)
         expired_ids.append(job_id)
 
@@ -205,6 +219,7 @@ async def cleanup_expired_results_periodically() -> None:
 def load_persisted_jobs() -> None:
     jobs.clear()
     result_paths.clear()
+    job_device_ids.clear()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     metadata_path = jobs_metadata_path()
 
@@ -215,8 +230,14 @@ def load_persisted_jobs() -> None:
             payload = []
         if isinstance(payload, list):
             for item in payload:
+                if not isinstance(item, dict):
+                    continue
+                job_payload = dict(item)
+                device_id = job_payload.pop("_device_id", LEGACY_DEVICE_ID)
+                if not isinstance(device_id, str) or not DEVICE_ID_PATTERN.fullmatch(device_id):
+                    device_id = LEGACY_DEVICE_ID
                 try:
-                    job = MediaJob.model_validate(item)
+                    job = MediaJob.model_validate(job_payload)
                 except (TypeError, ValueError):
                     continue
                 result_path = RESULTS_DIR / f"{job.id}.gif"
@@ -228,6 +249,7 @@ def load_persisted_jobs() -> None:
                     job.status = JobStatus.failed
                     job.error_message = "任务因后端服务重启而中断。"
                 jobs[job.id] = job
+                job_device_ids[job.id] = device_id
 
     for result_path in RESULTS_DIR.glob("*.gif"):
         if result_path.stem in jobs:
@@ -235,6 +257,7 @@ def load_persisted_jobs() -> None:
         job = historical_job(result_path)
         jobs[job.id] = job
         result_paths[job.id] = result_path
+        job_device_ids[job.id] = LEGACY_DEVICE_ID
 
     cleanup_expired_results(save_metadata=False)
     persist_jobs()
@@ -630,7 +653,9 @@ async def create_media_job(
     crop_height_percent: float | None = Form(None, gt=0, le=100),
     image_crop_options: str | None = Form(None),
     files: list[UploadFile] = File(...),
+    device_id: str | None = Header(None, alias="X-WottyGIF-Device-ID"),
 ) -> MediaJob:
+    requester_device_id = normalized_device_id(device_id)
     kinds = validate_uploads(mode, files)
     asset_origins = normalized_origins(origins, len(files))
     video_edit_options = build_video_edit_options(
@@ -668,6 +693,7 @@ async def create_media_job(
         result_name=result_filename(mode, names[0]),
     )
     jobs[job_id] = job
+    job_device_ids[job_id] = requester_device_id
     job.status = JobStatus.processing
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -696,6 +722,7 @@ async def create_media_job(
         persist_jobs()
     except HTTPException:
         jobs.pop(job_id, None)
+        job_device_ids.pop(job_id, None)
         persist_jobs()
         raise
     except Exception as exc:
@@ -708,9 +735,15 @@ async def create_media_job(
 
 
 @app.get("/api/media/jobs", response_model=list[MediaJob])
-def list_media_jobs() -> list[MediaJob]:
+def list_media_jobs(
+    device_id: str | None = Header(None, alias="X-WottyGIF-Device-ID"),
+) -> list[MediaJob]:
     cleanup_expired_results()
-    return sorted(jobs.values(), key=lambda job: job.created_at, reverse=True)
+    requester_device_id = normalized_device_id(device_id)
+    visible_jobs = [
+        job for job in jobs.values() if job_device_ids.get(job.id, LEGACY_DEVICE_ID) == requester_device_id
+    ]
+    return sorted(visible_jobs, key=lambda job: job.created_at, reverse=True)
 
 
 def archive_name(filename: str, used_names: set[str]) -> str:
@@ -726,12 +759,16 @@ def archive_name(filename: str, used_names: set[str]) -> str:
 
 
 @app.get("/api/media/jobs/batch-download")
-def batch_download_results() -> FileResponse:
+def batch_download_results(
+    device_id: str | None = Query(None),
+) -> FileResponse:
     cleanup_expired_results()
+    requester_device_id = normalized_device_id(device_id)
     completed_results = [
         (job, result_paths[job.id])
         for job in sorted(jobs.values(), key=lambda item: item.created_at)
         if job.status == JobStatus.completed
+        and job_device_ids.get(job.id, LEGACY_DEVICE_ID) == requester_device_id
         and job.id in result_paths
         and result_paths[job.id].exists()
     ]
@@ -763,11 +800,15 @@ def batch_download_results() -> FileResponse:
 
 
 @app.get("/api/media/jobs/{job_id}/result")
-def get_media_result(job_id: str) -> FileResponse:
+def get_media_result(
+    job_id: str,
+    device_id: str | None = Query(None),
+) -> FileResponse:
     cleanup_expired_results()
+    requester_device_id = normalized_device_id(device_id)
     job = jobs.get(job_id)
     result_path = result_paths.get(job_id)
-    if not job:
+    if not job or job_device_ids.get(job_id, LEGACY_DEVICE_ID) != requester_device_id:
         raise HTTPException(status_code=404, detail="任务不存在。")
     if job.status != JobStatus.completed or not result_path or not result_path.exists():
         raise HTTPException(status_code=409, detail="任务尚未生成成品。")

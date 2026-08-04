@@ -22,6 +22,7 @@ PNG_BYTES = base64.b64decode(
 def reset_jobs() -> None:
     main.jobs.clear()
     main.result_paths.clear()
+    main.job_device_ids.clear()
 
 
 def gradient_image(path, width: int, height: int) -> None:
@@ -302,6 +303,33 @@ def test_batch_download_contains_completed_results(tmp_path, monkeypatch) -> Non
     with ZipFile(BytesIO(response.content)) as archive:
         assert sorted(archive.namelist()) == ["first.gif", "second.gif"]
         assert all(archive.read(name).startswith(b"GIF") for name in archive.namelist())
+
+
+def test_jobs_results_and_downloads_are_isolated_by_device(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(main, "RESULTS_DIR", tmp_path)
+    device_a = "device-aaaaaaaaaaaaaaaa"
+    device_b = "device-bbbbbbbbbbbbbbbb"
+
+    created = client.post(
+        "/api/media/jobs",
+        headers={"X-WottyGIF-Device-ID": device_a},
+        data={
+            "mode": "single_image",
+            "quality": "3",
+            "origins": "upload",
+        },
+        files={"files": ("private.png", PNG_BYTES, "image/png")},
+    ).json()
+
+    assert [job["id"] for job in client.get(
+        "/api/media/jobs", headers={"X-WottyGIF-Device-ID": device_a}
+    ).json()] == [created["id"]]
+    assert client.get(
+        "/api/media/jobs", headers={"X-WottyGIF-Device-ID": device_b}
+    ).json() == []
+    assert client.get(f'{created["result_url"]}?device_id={device_a}').status_code == 200
+    assert client.get(f'{created["result_url"]}?device_id={device_b}').status_code == 404
+    assert client.get(f"/api/media/jobs/batch-download?device_id={device_b}").status_code == 409
 
 
 def test_reject_video_longer_than_30_seconds(tmp_path, monkeypatch) -> None:

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { CircleCheckBig, House, Maximize2, Pause, Play, Settings } from '@lucide/vue'
+import { CircleCheckBig, House, Maximize2, Pause, Play } from '@lucide/vue'
 import { createMediaJob, getHealth, listMediaJobs, resolveApiUrl } from './api/client.js'
 
 const MODE_OPTIONS = [
@@ -86,6 +86,50 @@ let assetSequence = 0
 let jobsRefreshTimer = null
 let cropInteraction = null
 let imageCropInteraction = null
+
+const MOBILE_PAGES = new Set(['home', 'configure', 'preview', 'jobs', 'detail'])
+
+const isMobileViewport = () =>
+  window.matchMedia('(max-width: 760px), ((max-height: 520px) and (pointer: coarse))').matches
+
+const setMobilePage = (nextPage, { replace = false } = {}) => {
+  if (!MOBILE_PAGES.has(nextPage) || mobilePage.value === nextPage) {
+    return
+  }
+
+  mobilePage.value = nextPage
+  if (!isMobileViewport()) {
+    return
+  }
+
+  const currentDepth = Number(window.history.state?.wottygifMobileDepth || 0)
+  const state = {
+    ...window.history.state,
+    wottygifMobilePage: nextPage,
+    wottygifMobileDepth: replace ? currentDepth : currentDepth + 1
+  }
+  if (replace) {
+    window.history.replaceState(state, '')
+  } else {
+    window.history.pushState(state, '')
+  }
+}
+
+const goMobileBack = (fallbackPage) => {
+  const depth = Number(window.history.state?.wottygifMobileDepth || 0)
+  if (isMobileViewport() && depth > 0) {
+    window.history.back()
+    return
+  }
+  setMobilePage(fallbackPage, { replace: true })
+}
+
+const handleMobileHistory = (event) => {
+  const targetPage = event.state?.wottygifMobilePage
+  if (isMobileViewport() && MOBILE_PAGES.has(targetPage)) {
+    mobilePage.value = targetPage
+  }
+}
 
 const CROP_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 
@@ -885,7 +929,12 @@ const addFiles = (files, origin) => {
   }
 
   if (assets.value.length) {
-    mobilePage.value = mobilePage.value === 'home' ? 'configure' : mobilePage.value
+    if (mobilePage.value === 'home') {
+      setMobilePage('configure')
+    }
+    nextTick(() => {
+      document.querySelector('.mobile-asset-workspace')?.scrollIntoView({ block: 'start' })
+    })
   }
 }
 
@@ -1022,16 +1071,16 @@ const applyModeRules = (nextMode) => {
 }
 
 const openHomePage = () => {
-  mobilePage.value = 'home'
+  setMobilePage('home')
 }
 
 const openModeConfigurator = (nextMode) => {
   applyModeRules(nextMode)
-  mobilePage.value = 'configure'
+  setMobilePage('configure')
 }
 
 const openConfigurePage = () => {
-  mobilePage.value = 'configure'
+  setMobilePage('configure')
 }
 
 const openPreviewPage = () => {
@@ -1053,18 +1102,18 @@ const openPreviewPage = () => {
     videoCropEditorOpen.value = false
   }
   errorMessage.value = ''
-  mobilePage.value = 'preview'
+  setMobilePage('preview')
 }
 
 const openMobileVideoEditor = async () => {
-  mobilePage.value = 'configure'
+  setMobilePage('configure')
   openVideoCropEditor()
   await nextTick()
   document.querySelector('.mobile-source-stage')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 const openMobileImageCropEditor = async () => {
-  mobilePage.value = 'configure'
+  setMobilePage('configure')
   imageCropEditorOpen.value = true
   await nextTick()
   document.querySelector('.mobile-source-stage.image-crop-stage')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -1077,21 +1126,17 @@ const reopenImageCropEditor = async () => {
 }
 
 const openJobsPage = () => {
-  mobilePage.value = 'jobs'
+  setMobilePage('jobs')
   refreshJobs().catch(() => {})
-}
-
-const openSettingsPage = () => {
-  mobilePage.value = 'settings'
 }
 
 const openJobDetail = (job) => {
   selectedJobId.value = job.id
-  mobilePage.value = 'detail'
+  setMobilePage('detail')
 }
 
 const closeJobDetail = () => {
-  mobilePage.value = 'jobs'
+  goMobileBack('jobs')
 }
 
 const buildImageCropOptions = (selectedAssets) => {
@@ -1212,15 +1257,16 @@ const submitJob = async () => {
     await checkHealth()
     if (createdJobs.length === 1) {
       selectedJobId.value = createdJobs[0].id
-      mobilePage.value = 'detail'
+      setMobilePage('jobs')
+      setMobilePage('detail')
     } else {
       selectedJobId.value = ''
-      mobilePage.value = 'jobs'
+      setMobilePage('jobs')
     }
   } catch (error) {
     errorMessage.value = error.message
     await refreshJobs()
-    mobilePage.value = 'jobs'
+    setMobilePage('jobs')
   } finally {
     isSubmitting.value = false
   }
@@ -1264,6 +1310,17 @@ const openJobPreview = (job) => {
 
 onMounted(async () => {
   window.addEventListener('paste', handleGlobalPaste)
+  window.addEventListener('popstate', handleMobileHistory)
+  if (isMobileViewport()) {
+    window.history.replaceState(
+      {
+        ...window.history.state,
+        wottygifMobilePage: mobilePage.value,
+        wottygifMobileDepth: 0
+      },
+      ''
+    )
+  }
   await checkHealth()
   await refreshJobs()
   jobsRefreshTimer = window.setInterval(() => {
@@ -1277,6 +1334,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointercancel', finishCropInteraction)
   cropInteraction = null
   window.removeEventListener('paste', handleGlobalPaste)
+  window.removeEventListener('popstate', handleMobileHistory)
   if (jobsRefreshTimer) {
     window.clearInterval(jobsRefreshTimer)
   }
@@ -1790,13 +1848,9 @@ onBeforeUnmount(() => {
     <section class="mobile-shell">
       <section v-if="mobilePage === 'home'" class="mobile-page mobile-home">
         <header class="mobile-topbar">
-          <button class="nav-icon" type="button" aria-label="返回首页">
-            <span aria-hidden="true">‹</span>
-          </button>
+          <span class="topbar-spacer"></span>
           <h2>GIF 制作</h2>
-          <button class="nav-icon" type="button" aria-label="打开设置" @click="openSettingsPage">
-            <span aria-hidden="true">⚙</span>
-          </button>
+          <span class="topbar-spacer"></span>
         </header>
 
         <div class="mobile-page-body">
@@ -1831,16 +1885,12 @@ onBeforeUnmount(() => {
             <CircleCheckBig class="mobile-tab-icon" :size="22" :stroke-width="2" aria-hidden="true" />
             <strong>已完成</strong>
           </button>
-          <button class="mobile-tab" type="button" @click="openSettingsPage">
-            <Settings class="mobile-tab-icon" :size="22" :stroke-width="2" aria-hidden="true" />
-            <strong>设置</strong>
-          </button>
         </nav>
       </section>
 
       <section v-else-if="mobilePage === 'configure'" class="mobile-page">
         <header class="mobile-topbar">
-          <button class="nav-icon" type="button" aria-label="返回首页" @click="openHomePage">
+          <button class="nav-icon" type="button" aria-label="返回首页" @click="goMobileBack('home')">
             <span aria-hidden="true">‹</span>
           </button>
           <h2>{{ modeMeta.label }}</h2>
@@ -2111,94 +2161,56 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <section class="mobile-section">
-            <h3>生成质量</h3>
-            <div class="mobile-quality-row">
-              <button
-                v-for="option in QUALITY_OPTIONS"
-                :key="option.value"
-                class="mobile-quality-pill"
-                :class="{ active: option.value === quality }"
-                type="button"
-                @click="quality = option.value"
-              >
-                <span>{{ option.label.replace('质量', '') }}</span>
-                <strong>{{ option.detail }}</strong>
-              </button>
-            </div>
-          </section>
-
-          <section class="mobile-section">
-            <h3>设置选项</h3>
-            <div v-if="mode === 'video'" class="mobile-setting-stack">
-              <div v-if="previewAsset?.kind === 'video'" class="crop-editor mobile-crop-editor">
-                <div class="crop-editor-head">
-                  <div>
-                    <strong>画面裁剪</strong>
-                    <span>{{ cropSummary }}</span>
-                  </div>
-                  <button type="button" @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()">
-                    {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
-                  </button>
+          <section v-if="mode === 'video' && previewAsset?.kind === 'video'" class="mobile-section mobile-video-crop-section">
+            <h3>画面裁剪</h3>
+            <div class="crop-editor mobile-crop-editor">
+              <div class="crop-editor-head">
+                <div>
+                  <strong>裁剪区域</strong>
+                  <span>{{ cropSummary }}</span>
                 </div>
-                <div v-if="videoCropEditorOpen" class="crop-range-list">
-                  <label>
-                    <span>裁剪宽度</span>
-                    <input
-                      v-model="cropWidthPercent"
-                      type="range"
-                      min="1"
-                      :max="cropWidthMax"
-                      step="1"
-                      @input="constrainCropFields"
-                    />
-                    <output>{{ cropBox.width }}%</output>
-                  </label>
-                  <label>
-                    <span>裁剪高度</span>
-                    <input
-                      v-model="cropHeightPercent"
-                      type="range"
-                      min="1"
-                      :max="cropHeightMax"
-                      step="1"
-                      @input="constrainCropFields"
-                    />
-                    <output>{{ cropBox.height }}%</output>
-                  </label>
-                </div>
-                <div v-if="videoCropEditorOpen" class="crop-editor-actions">
-                  <button type="button" @click="cancelCropChanges">取消修改</button>
-                  <button
-                    class="crop-confirm-button"
-                    :class="{ confirmed: !cropIsDirty }"
-                    type="button"
-                    @click="confirmCrop"
-                  >
-                    {{ cropIsDirty ? '确认裁剪' : '完成裁剪' }}
-                  </button>
-                </div>
+                <button type="button" @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()">
+                  {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
+                </button>
               </div>
-              <div class="mobile-setting-group">
-                <label class="number-field">
-                  <span>开始时间</span>
-                  <input v-model="clipStartSeconds" type="number" min="0" step="0.1" inputmode="decimal" />
-                  <small>秒</small>
-                </label>
-                <label class="number-field">
-                  <span>结束时间</span>
+              <div v-if="videoCropEditorOpen" class="crop-editor-actions">
+                <button type="button" @click="cancelCropChanges">取消修改</button>
+                <button
+                  class="crop-confirm-button"
+                  :class="{ confirmed: !cropIsDirty }"
+                  type="button"
+                  @click="confirmCrop"
+                >
+                  {{ cropIsDirty ? '确认裁剪' : '完成裁剪' }}
+                </button>
+              </div>
+              <div v-if="videoCropEditorOpen" class="crop-range-list">
+                <label>
+                  <span>裁剪宽度</span>
                   <input
-                    v-model="clipEndSeconds"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    inputmode="decimal"
-                    placeholder="到结尾"
+                    v-model="cropWidthPercent"
+                    type="range"
+                    min="1"
+                    :max="cropWidthMax"
+                    step="1"
+                    @input="constrainCropFields"
                   />
-                  <small>秒</small>
+                  <output>{{ cropBox.width }}%</output>
+                </label>
+                <label>
+                  <span>裁剪高度</span>
+                  <input
+                    v-model="cropHeightPercent"
+                    type="range"
+                    min="1"
+                    :max="cropHeightMax"
+                    step="1"
+                    @input="constrainCropFields"
+                  />
+                  <output>{{ cropBox.height }}%</output>
                 </label>
               </div>
-              <div v-if="videoCropEditorOpen" class="mobile-setting-group crop-grid">
+              <div v-if="videoCropEditorOpen" class="crop-grid">
                 <label class="number-field">
                   <span>左侧位置</span>
                   <input v-model="cropLeftPercent" type="number" min="0" max="100" step="1" inputmode="decimal" @change="constrainCropFields" />
@@ -2221,8 +2233,51 @@ onBeforeUnmount(() => {
                 </label>
               </div>
             </div>
+          </section>
 
-            <div v-else class="mobile-setting-list">
+          <section class="mobile-section">
+            <h3>生成质量</h3>
+            <div class="mobile-quality-row">
+              <button
+                v-for="option in QUALITY_OPTIONS"
+                :key="option.value"
+                class="mobile-quality-pill"
+                :class="{ active: option.value === quality }"
+                type="button"
+                @click="quality = option.value"
+              >
+                <span>{{ option.label.replace('质量', '') }}</span>
+                <strong>{{ option.detail }}</strong>
+              </button>
+            </div>
+          </section>
+
+          <section v-if="mode === 'video'" class="mobile-section">
+            <h3>片段时间</h3>
+            <div class="mobile-time-grid">
+              <label class="number-field">
+                <span>开始时间</span>
+                <input v-model="clipStartSeconds" type="number" min="0" step="0.1" inputmode="decimal" />
+                <small>秒</small>
+              </label>
+              <label class="number-field">
+                <span>结束时间</span>
+                <input
+                  v-model="clipEndSeconds"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  placeholder="到结尾"
+                />
+                <small>秒</small>
+              </label>
+            </div>
+          </section>
+
+          <section v-else class="mobile-section">
+            <h3>设置选项</h3>
+            <div class="mobile-setting-list">
               <div class="mobile-setting-row">
                 <span>帧率</span>
                 <strong>{{ currentFpsLabel }}</strong>
@@ -2255,7 +2310,7 @@ onBeforeUnmount(() => {
 
       <section v-else-if="mobilePage === 'preview'" class="mobile-page">
         <header class="mobile-topbar">
-          <button class="nav-icon" type="button" aria-label="返回参数页" @click="openConfigurePage">
+          <button class="nav-icon" type="button" aria-label="返回参数页" @click="goMobileBack('configure')">
             <span aria-hidden="true">‹</span>
           </button>
           <h2>制作预览</h2>
@@ -2388,7 +2443,7 @@ onBeforeUnmount(() => {
 
       <section v-else-if="mobilePage === 'jobs'" class="mobile-page">
         <header class="mobile-topbar">
-          <button class="nav-icon" type="button" aria-label="返回首页" @click="openHomePage">
+          <button class="nav-icon" type="button" aria-label="返回首页" @click="goMobileBack('home')">
             <span aria-hidden="true">‹</span>
           </button>
           <h2>已完成</h2>
@@ -2427,10 +2482,6 @@ onBeforeUnmount(() => {
           <button class="mobile-tab active" type="button" aria-current="page">
             <CircleCheckBig class="mobile-tab-icon" :size="22" :stroke-width="2" aria-hidden="true" />
             <strong>已完成</strong>
-          </button>
-          <button class="mobile-tab" type="button" @click="openSettingsPage">
-            <Settings class="mobile-tab-icon" :size="22" :stroke-width="2" aria-hidden="true" />
-            <strong>设置</strong>
           </button>
         </nav>
       </section>
@@ -2493,60 +2544,6 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section v-else class="mobile-page">
-        <header class="mobile-topbar">
-          <button class="nav-icon" type="button" aria-label="返回首页" @click="openHomePage">
-            <span aria-hidden="true">‹</span>
-          </button>
-          <h2>设置</h2>
-          <span class="topbar-spacer"></span>
-        </header>
-
-        <div class="mobile-page-body">
-          <section class="mobile-section">
-            <h3>当前状态</h3>
-            <div class="mobile-setting-list">
-              <div class="mobile-setting-row">
-                <span>后端服务</span>
-                <strong>{{ healthLabel }}</strong>
-              </div>
-              <div class="mobile-setting-row">
-                <span>当前模式</span>
-                <strong>{{ modeMeta.label }}</strong>
-              </div>
-              <div class="mobile-setting-row">
-                <span>当前质量</span>
-                <strong>{{ currentQualityMeta.label }}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="mobile-section">
-            <h3>快捷操作</h3>
-            <div class="mobile-settings-actions">
-              <button class="ghost-button" type="button" :disabled="!assets.length" @click="resetAssets">清空素材</button>
-              <button class="primary-button" type="button" :disabled="!completedJobs.length" @click="downloadCompletedJobs">
-                批量下载
-              </button>
-            </div>
-          </section>
-        </div>
-
-        <nav class="mobile-tabbar" aria-label="移动端导航">
-          <button class="mobile-tab" type="button" @click="openHomePage">
-            <House class="mobile-tab-icon" :size="22" :stroke-width="2" aria-hidden="true" />
-            <strong>首页</strong>
-          </button>
-          <button class="mobile-tab" type="button" @click="openJobsPage">
-            <CircleCheckBig class="mobile-tab-icon" :size="22" :stroke-width="2" aria-hidden="true" />
-            <strong>已完成</strong>
-          </button>
-          <button class="mobile-tab active" type="button" aria-current="page">
-            <Settings class="mobile-tab-icon" :size="22" :stroke-width="2" aria-hidden="true" />
-            <strong>设置</strong>
-          </button>
-        </nav>
-      </section>
     </section>
 
     <input

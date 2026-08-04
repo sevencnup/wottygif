@@ -21,7 +21,9 @@ WottyGIF is a local Python and Vue media studio that generates downloadable GIF 
 - Solid-blue interface theme with a 110% large-screen workspace and unchanged mobile sizing
 - Mode-scoped asset retention and direct image cropping inside the existing preview window
 - Persistent completed-job history that is restored after backend restarts
-- Borderless mobile bottom navigation using official Lucide icon components
+- Anonymous browser-device isolation for completed lists, previews, and downloads
+- Two-tab mobile bottom navigation using official Lucide icon components
+- Mobile history integration for in-app system swipe-back navigation
 
 ## Stack
 
@@ -61,13 +63,15 @@ pnpm --filter wottygif-frontend dev
 - `image_crop_options`: optional ordered JSON array of per-image crop boxes or `{ "skip": true }`
 - `files`: the real image or video files
 
+The frontend stores a random anonymous device ID in browser local storage and sends it as `X-WottyGIF-Device-ID`. Job lists are filtered by this header. Result and batch-download URLs carry the same ID as the `device_id` query parameter because image and download elements cannot attach custom request headers. This separates normal browser devices but is not a replacement for account authentication on an untrusted public network.
+
 Completed jobs expose `GET /api/media/jobs/{job_id}/result` for GIF preview and download. Generated files and persistent job metadata are stored under `backend/data/results` and are ignored by Git. Existing GIF files without metadata are recovered as historical completed jobs when the backend starts.
 
 ## Version
 
 Completed GIF files are temporary backend cache entries. They are automatically removed one hour after generation completes, along with their completed-task records.
 
-Current version: `0.3.26`
+Current version: `0.3.27`
 
 ## One Command Dev Start
 

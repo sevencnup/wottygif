@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.27 - 2026-08-04
+
+- Focused the mobile asset workspace immediately after video or image upload so editing is visible without returning to the upload prompt.
+- Moved mobile video cropping above quality, placed crop confirmation before the sliders, and arranged clip start/end inputs side by side.
+- Added mobile page history so browser and system swipe-back gestures return to the previous in-app screen.
+- Removed the unused mobile settings screen and reduced bottom navigation to Home and Completed.
+- Fixed completed-file text overlap and made mobile bottom action/navigation surfaces fully opaque through the safe area.
+- Isolated job lists, previews, individual downloads, and batch downloads by an anonymous per-browser device ID.
+
 ## 0.3.26 - 2026-08-04
 
 - Compressed the desktop left control rail so upload, quality, crop controls, summary, and submit actions fit in the fixed viewport.

@@ -1,5 +1,7 @@
 # WottyGIF Media Generation
 
+> Current implementation version: `0.3.27`
+
 > Backend retention: completed GIF cache files and their task records expire one hour after generation completes. Cleanup runs on backend startup, every 60 seconds, and when completed results are listed or downloaded.
 
 ## Goal
@@ -18,6 +20,8 @@ Turn pasted, dropped, or selected image and video files into real GIF output tha
 8. Vue displays the finished animation and links to `GET /api/media/jobs/{job_id}/result`.
 
 Job metadata is atomically persisted to `backend/data/results/jobs.json` whenever a task starts, completes, fails, or is removed. Backend startup reloads that metadata, reconnects completed jobs to their GIF files, marks interrupted processing jobs as failed, and imports orphaned GIF files as historical completed results. The frontend refreshes the job list every two seconds and whenever the completed screen opens, so a running page recovers after a backend restart without a manual reload.
+
+Each browser installation creates an anonymous local device ID. API list requests send it in `X-WottyGIF-Device-ID`, while result and batch-download URLs use the `device_id` query parameter. The backend persists that ownership value and only returns matching tasks and files. This is lightweight device separation for a local or trusted LAN deployment, not account-based authentication for a public service.
 
 ## Mode Rules
 
