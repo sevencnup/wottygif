@@ -38,7 +38,8 @@ body,
 body {
   min-height: 100vh;
   min-height: 100dvh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--page);
   color: var(--ink);
 }
@@ -91,9 +92,8 @@ p {
 
 .workspace {
   width: min(1680px, 100%);
-  height: min(920px, calc(100dvh - 16px));
-  min-height: 580px;
-  overflow: hidden;
+  min-height: min(920px, calc(100dvh - 16px));
+  overflow: visible;
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -102,6 +102,7 @@ p {
 .studio-grid {
   display: grid;
   grid-template-columns: 430px minmax(440px, 1fr) 370px;
+  align-items: stretch;
 }
 
 .mobile-shell {
@@ -117,8 +118,9 @@ p {
 
 .control-panel {
   display: grid;
-  grid-template-rows: auto auto auto auto auto auto auto 1fr;
-  overflow: auto;
+  grid-template-rows: repeat(8, auto);
+  align-content: start;
+  overflow: visible;
   border-right: 1px solid var(--line);
   background: var(--surface);
 }

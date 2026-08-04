@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.25 - 2026-08-04
+
+- Removed the desktop left control rail's independent vertical scrolling.
+- Let the outer workspace/page carry overflow when desktop controls exceed the available viewport height.
+- Kept the mobile shell's app-style fixed viewport behavior unchanged.
+
 ## 0.3.24 - 2026-08-04
 
 - Added live elapsed-time and selected-duration labels to desktop and mobile video previews.

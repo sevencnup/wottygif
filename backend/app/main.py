@@ -85,7 +85,7 @@ class MediaJob(BaseModel):
     error_message: str | None = None
 
 
-app = FastAPI(title="WottyGIF API", version="0.3.24", lifespan=lifespan)
+app = FastAPI(title="WottyGIF API", version="0.3.25", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
