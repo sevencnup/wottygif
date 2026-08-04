@@ -59,6 +59,7 @@ const cropIsDirty = ref(false)
 const confirmedCropBox = ref({ left: 0, top: 0, width: 100, height: 100 })
 const videoCropEditorOpen = ref(false)
 const videoPlaybackStates = ref({})
+const videoProgressStates = ref({})
 const desktopPreviewVideo = ref(null)
 const mobileSourceVideo = ref(null)
 const mobilePreviewVideo = ref(null)
@@ -169,22 +170,44 @@ const submitHint = computed(() => {
 
 const currentFpsLabel = computed(() => (quality.value <= 2 ? '6 FPS' : quality.value === 3 ? '10 FPS' : '12 FPS'))
 
-const videoClipLabel = computed(() => {
+const clipBounds = (mediaDuration = 0) => {
+  const rawStart = Number(clipStartSeconds.value || 0)
+  const requestedEnd = clipEndSeconds.value === '' ? null : Number(clipEndSeconds.value)
+  const start = Number.isFinite(rawStart) ? Math.max(0, rawStart) : 0
+  const knownDuration = Number.isFinite(mediaDuration) && mediaDuration > 0 ? mediaDuration : 0
+  const fallbackEnd = requestedEnd !== null && Number.isFinite(requestedEnd) ? requestedEnd : 0
+  const sourceEnd = knownDuration || fallbackEnd
+  const end = requestedEnd !== null && Number.isFinite(requestedEnd)
+    ? Math.min(Math.max(requestedEnd, start), sourceEnd)
+    : sourceEnd
+  return { start, end, duration: Math.max(end - start, 0) }
+}
+
+const formatPlaybackTime = (seconds) => {
+  const safe = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0))
+  const minutes = String(Math.floor(safe / 60)).padStart(2, '0')
+  const remain = String(safe % 60).padStart(2, '0')
+  return `${minutes}:${remain}`
+}
+
+const videoProgress = (surface) => {
+  const state = videoProgressStates.value[surface] ?? { currentTime: 0, duration: 0 }
+  const bounds = clipBounds(state.duration)
+  const elapsed = Math.min(Math.max(state.currentTime - bounds.start, 0), bounds.duration)
+  const percent = bounds.duration > 0 ? (elapsed / bounds.duration) * 100 : 0
+  return { elapsed, duration: bounds.duration, percent }
+}
+
+const videoClipLabel = (surface) => {
   if (mode.value !== 'video') {
     return '00:00 / 00:03'
   }
+  const progress = videoProgress(surface)
+  return `${formatPlaybackTime(progress.elapsed)} / ${formatPlaybackTime(progress.duration)}`
+}
 
-  const start = Number(clipStartSeconds.value || 0)
-  const end = clipEndSeconds.value === '' ? null : Number(clipEndSeconds.value)
-  const duration = end !== null && Number.isFinite(end) ? Math.max(end - start, 0) : 30
-  const format = (seconds) => {
-    const safe = Math.max(0, Math.floor(seconds))
-    const minutes = String(Math.floor(safe / 60)).padStart(2, '0')
-    const remain = String(safe % 60).padStart(2, '0')
-    return `${minutes}:${remain}`
-  }
-
-  return `${format(start)} / ${format(duration)}`
+const videoTimelineStyle = (surface) => ({
+  width: `${videoProgress(surface).percent}%`
 })
 
 const cropSummary = computed(() => {
@@ -371,7 +394,20 @@ const resetCropForNewVideo = () => {
   clipEndSeconds.value = ''
 }
 
-const handleVideoMetadata = (event, assetId = previewAsset.value?.id) => {
+const updateVideoProgress = (video, surface) => {
+  if (!surface) {
+    return
+  }
+  videoProgressStates.value = {
+    ...videoProgressStates.value,
+    [surface]: {
+      currentTime: Number.isFinite(video.currentTime) ? video.currentTime : 0,
+      duration: Number.isFinite(video.duration) ? video.duration : 0
+    }
+  }
+}
+
+const handleVideoMetadata = (event, assetId = previewAsset.value?.id, surface = '') => {
   const video = event.currentTarget
   if (video.videoWidth > 0 && video.videoHeight > 0) {
     if (assetId) {
@@ -381,6 +417,25 @@ const handleVideoMetadata = (event, assetId = previewAsset.value?.id) => {
       }
     }
   }
+  const bounds = clipBounds(video.duration)
+  if (bounds.start < video.duration && (video.currentTime < bounds.start || video.currentTime >= bounds.end)) {
+    video.currentTime = bounds.start
+  }
+  updateVideoProgress(video, surface)
+}
+
+const handleVideoTimeUpdate = (event, surface) => {
+  const video = event.currentTarget
+  const bounds = clipBounds(video.duration)
+  if (!video.paused && video.currentTime < bounds.start) {
+    video.currentTime = bounds.start
+  } else if (!video.paused && bounds.duration > 0 && video.currentTime >= bounds.end) {
+    if (Math.abs(video.currentTime - bounds.end) > 0.04) {
+      video.currentTime = bounds.end
+    }
+    video.pause()
+  }
+  updateVideoProgress(video, surface)
 }
 
 const videoRefs = [
@@ -406,6 +461,7 @@ const syncVideoPlaybackState = (event, surface) => {
       video.pause()
     }
   })
+  updateVideoProgress(currentVideo, surface)
   setVideoPlaybackState(surface, !currentVideo.paused)
 }
 
@@ -419,6 +475,11 @@ const toggleVideoPlayback = (video, surface) => {
   }
 
   if (video.paused) {
+    const bounds = clipBounds(video.duration)
+    if (video.currentTime < bounds.start || video.currentTime >= bounds.end - 0.04) {
+      video.currentTime = bounds.start
+      updateVideoProgress(video, surface)
+    }
     video.play().catch(() => {
       setVideoPlaybackState(surface, false)
     })
@@ -1579,11 +1640,13 @@ onBeforeUnmount(() => {
                 :src="previewAsset.preview_url"
                 muted
                 playsinline
+                preload="metadata"
                 :controls="false"
                 :autoplay="false"
                 :loop="false"
                 :aria-label="previewAsset.name"
-                @loadedmetadata="handleVideoMetadata($event, previewAsset.id)"
+                @loadedmetadata="handleVideoMetadata($event, previewAsset.id, 'desktop-preview')"
+                @timeupdate="handleVideoTimeUpdate($event, 'desktop-preview')"
                 @play="syncVideoPlaybackState($event, 'desktop-preview')"
                 @pause="stopVideoPlaybackState('desktop-preview')"
                 @ended="stopVideoPlaybackState('desktop-preview')"
@@ -1623,8 +1686,8 @@ onBeforeUnmount(() => {
               <Pause v-if="isVideoPlaying('desktop-preview')" :size="18" :stroke-width="2.4" aria-hidden="true" />
               <Play v-else :size="18" :stroke-width="2.4" aria-hidden="true" />
             </button>
-            <span class="time-label">{{ videoClipLabel }}</span>
-            <div class="timeline" aria-hidden="true"><span></span></div>
+            <span class="time-label">{{ videoClipLabel('desktop-preview') }}</span>
+            <div class="timeline" aria-hidden="true"><span :style="videoTimelineStyle('desktop-preview')"></span></div>
             <strong>{{ quality <= 2 ? '6 FPS' : quality === 3 ? '10 FPS' : '12 FPS' }}</strong>
             <button class="icon-button" type="button" aria-label="全屏预览">
               <Maximize2 :size="17" :stroke-width="2.3" aria-hidden="true" />
@@ -1886,7 +1949,8 @@ onBeforeUnmount(() => {
                   :loop="false"
                   preload="metadata"
                   :aria-label="previewAsset.name"
-                  @loadedmetadata="handleVideoMetadata($event, previewAsset.id)"
+                  @loadedmetadata="handleVideoMetadata($event, previewAsset.id, 'mobile-source')"
+                  @timeupdate="handleVideoTimeUpdate($event, 'mobile-source')"
                   @play="syncVideoPlaybackState($event, 'mobile-source')"
                   @pause="stopVideoPlaybackState('mobile-source')"
                   @ended="stopVideoPlaybackState('mobile-source')"
@@ -2223,11 +2287,13 @@ onBeforeUnmount(() => {
                 :src="previewAsset.preview_url"
                 muted
                 playsinline
+                preload="metadata"
                 :controls="false"
                 :autoplay="false"
                 :loop="false"
                 :aria-label="previewAsset.name"
-                @loadedmetadata="handleVideoMetadata($event, previewAsset.id)"
+                @loadedmetadata="handleVideoMetadata($event, previewAsset.id, 'mobile-preview')"
+                @timeupdate="handleVideoTimeUpdate($event, 'mobile-preview')"
                 @play="syncVideoPlaybackState($event, 'mobile-preview')"
                 @pause="stopVideoPlaybackState('mobile-preview')"
                 @ended="stopVideoPlaybackState('mobile-preview')"
@@ -2249,8 +2315,8 @@ onBeforeUnmount(() => {
               <Pause v-if="isVideoPlaying('mobile-preview')" :size="17" :stroke-width="2.4" aria-hidden="true" />
               <Play v-else :size="17" :stroke-width="2.4" aria-hidden="true" />
             </button>
-            <span>{{ videoClipLabel }}</span>
-            <div class="timeline" aria-hidden="true"><span></span></div>
+            <span>{{ videoClipLabel('mobile-preview') }}</span>
+            <div class="timeline" aria-hidden="true"><span :style="videoTimelineStyle('mobile-preview')"></span></div>
             <strong>{{ currentFpsLabel }}</strong>
           </div>
 

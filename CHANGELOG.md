@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.24 - 2026-08-04
+
+- Added live elapsed-time and selected-duration labels to desktop and mobile video previews.
+- Replaced the fixed timeline fill with progress driven by each visible video's current playback time.
+- Made preview playback honor the selected clip start and end, pause at the end, and restart from the clip beginning.
+
 ## 0.3.23 - 2026-08-04
 
 - Moved desktop video cropping into the production preview and mobile video cropping into the source preview, removing both duplicate crop videos.
