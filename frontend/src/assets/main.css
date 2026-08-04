@@ -38,8 +38,7 @@ body,
 body {
   min-height: 100vh;
   min-height: 100dvh;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--page);
   color: var(--ink);
 }
@@ -92,8 +91,9 @@ p {
 
 .workspace {
   width: min(1680px, 100%);
-  min-height: min(920px, calc(100dvh - 16px));
-  overflow: visible;
+  height: min(920px, calc(100dvh - 16px));
+  min-height: 580px;
+  overflow: hidden;
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
@@ -130,8 +130,8 @@ p {
   grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 72px;
-  padding: 18px 20px 14px;
+  min-height: 62px;
+  padding: 13px 18px 11px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -190,7 +190,7 @@ h1 {
 }
 
 .control-section {
-  padding: 18px 20px 0;
+  padding: 12px 18px 0;
 }
 
 .section-title,
@@ -203,8 +203,8 @@ h1 {
 .mode-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .mode-card,
@@ -220,11 +220,11 @@ h1 {
 }
 
 .mode-card {
-  min-height: 110px;
+  min-height: 86px;
   justify-items: center;
   align-content: center;
-  gap: 7px;
-  padding: 12px 8px;
+  gap: 5px;
+  padding: 9px 6px;
   text-align: center;
 }
 
@@ -345,16 +345,18 @@ h1 {
 .paste-zone {
   position: relative;
   display: grid;
-  min-height: 110px;
-  place-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 18px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  min-height: 70px;
+  align-items: center;
+  justify-items: start;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px 14px;
   border-radius: 8px;
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--accent);
   cursor: pointer;
-  text-align: center;
+  text-align: left;
   transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
@@ -396,15 +398,15 @@ h1 {
 .quality-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .quality-card {
-  min-height: 80px;
+  min-height: 68px;
   align-content: center;
-  gap: 3px;
-  padding: 10px 8px;
+  gap: 2px;
+  padding: 8px 6px;
   text-align: center;
 }
 
@@ -422,14 +424,14 @@ h1 {
 
 .video-edit-panel {
   display: grid;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .crop-editor {
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px;
   border-radius: 8px;
   background: var(--surface-soft);
 }
@@ -589,7 +591,7 @@ h1 {
 
 .crop-range-list {
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 .crop-range-list label {
@@ -616,11 +618,11 @@ h1 {
 .crop-editor-actions {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: 8px;
+  gap: 7px;
 }
 
 .crop-editor-actions button {
-  min-height: 40px;
+  min-height: 36px;
   border-radius: 7px;
   background: var(--surface-muted);
   color: var(--ink-soft);
@@ -763,7 +765,7 @@ h1 {
 .video-edit-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .crop-row {
@@ -773,7 +775,7 @@ h1 {
 .number-field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px 8px;
+  gap: 5px 7px;
   min-width: 0;
   align-items: center;
 }
@@ -796,8 +798,8 @@ h1 {
 .number-field input {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  padding: 0 12px;
+  min-height: 38px;
+  padding: 0 10px;
   border: 0;
   border-radius: 8px;
   background: var(--surface-soft);
@@ -829,13 +831,13 @@ h1 {
 .summary-bar {
   display: grid;
   grid-template-columns: 0.72fr 0.82fr 1.46fr;
-  gap: 8px;
-  padding: 14px 20px 0;
+  gap: 7px;
+  padding: 10px 18px 0;
 }
 
 .summary-bar > div {
   min-width: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 8px;
   background: var(--surface-soft);
 }
@@ -851,8 +853,8 @@ h1 {
 }
 
 .message {
-  margin: 12px 20px 0;
-  padding: 9px 11px;
+  margin: 8px 18px 0;
+  padding: 7px 10px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
@@ -873,8 +875,8 @@ h1 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-self: end;
-  gap: 10px;
-  padding: 18px 20px 8px;
+  gap: 8px;
+  padding: 12px 18px 6px;
 }
 
 .primary-button,
@@ -884,7 +886,7 @@ h1 {
 .icon-link,
 .add-frame {
   display: inline-flex;
-  min-height: 44px;
+  min-height: 40px;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
@@ -927,7 +929,7 @@ h1 {
 }
 
 .submit-hint {
-  padding: 0 20px 18px;
+  padding: 0 18px 10px;
 }
 
 .preview-panel {
@@ -2028,6 +2030,211 @@ h1 {
     width: min(1680px, calc(90.909vw - 14.55px));
     height: min(920px, calc(90.909dvh - 14.55px));
     zoom: 1.1;
+  }
+}
+
+@media (min-width: 981px) and (max-height: 760px) {
+  .brand-header {
+    min-height: 48px;
+    padding: 8px 14px;
+  }
+
+  .brand-mark {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  h1 {
+    font-size: 16px;
+  }
+
+  .brand-copy p,
+  .mode-card small,
+  .quality-card span,
+  .paste-copy p,
+  .submit-hint {
+    display: none;
+  }
+
+  .control-section {
+    padding: 8px 14px 0;
+  }
+
+  .section-title {
+    font-size: 13px;
+  }
+
+  .mode-strip,
+  .quality-grid {
+    gap: 6px;
+    margin-top: 5px;
+  }
+
+  .mode-card {
+    min-height: 52px;
+    gap: 3px;
+    padding: 6px 4px;
+  }
+
+  .mode-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .mode-icon::before,
+  .upload-icon::before {
+    width: 12px;
+    height: 9px;
+  }
+
+  .mode-icon::after,
+  .upload-icon::after {
+    width: 6px;
+    height: 6px;
+  }
+
+  .mode-video .mode-icon::before {
+    width: 14px;
+    height: 10px;
+  }
+
+  .mode-video .mode-icon::after {
+    right: 5px;
+    border-top-width: 4px;
+    border-bottom-width: 4px;
+    border-left-width: 6px;
+  }
+
+  .paste-zone {
+    grid-template-columns: 26px minmax(0, 1fr);
+    min-height: 50px;
+    gap: 8px;
+    margin-top: 5px;
+    padding: 8px 10px;
+  }
+
+  .upload-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .quality-card {
+    min-height: 50px;
+    padding: 5px 4px;
+  }
+
+  .quality-card em {
+    font-size: 11px;
+  }
+
+  .video-edit-panel,
+  .image-edit-panel {
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .crop-editor,
+  .image-crop-editor {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .crop-editor-head button,
+  .image-crop-head > button {
+    min-height: 28px;
+  }
+
+  .crop-range-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .crop-range-list label {
+    grid-template-columns: 54px minmax(0, 1fr) 32px;
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .crop-range-list output,
+  .crop-editor-head span,
+  .image-crop-head span {
+    font-size: 11px;
+  }
+
+  .crop-editor-actions button,
+  .image-crop-nav button,
+  .image-crop-actions button {
+    min-height: 32px;
+  }
+
+  .video-edit-row {
+    gap: 6px;
+  }
+
+  .crop-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .number-field {
+    gap: 3px 5px;
+  }
+
+  .number-field span,
+  .number-field small {
+    font-size: 11px;
+  }
+
+  .number-field input,
+  .select-field select {
+    min-height: 32px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .summary-bar {
+    gap: 6px;
+    padding: 5px 14px 0;
+  }
+
+  .summary-bar > div {
+    display: flex;
+    min-height: 30px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 5px 8px;
+  }
+
+  .summary-bar strong {
+    margin-top: 0;
+    font-size: 11px;
+  }
+
+  .summary-label {
+    font-size: 11px;
+  }
+
+  .message {
+    max-height: 34px;
+    overflow: hidden;
+    margin: 6px 14px 0;
+    padding: 5px 8px;
+  }
+
+  .submit-row {
+    gap: 6px;
+    padding: 5px 14px 4px;
+  }
+
+  .primary-button,
+  .ghost-button {
+    min-height: 32px;
+    font-size: 12px;
+  }
+
+  .ghost-button {
+    padding: 0 10px;
   }
 }
 

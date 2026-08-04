@@ -67,7 +67,7 @@ Completed jobs expose `GET /api/media/jobs/{job_id}/result` for GIF preview and 
 
 Completed GIF files are temporary backend cache entries. They are automatically removed one hour after generation completes, along with their completed-task records.
 
-Current version: `0.3.25`
+Current version: `0.3.26`
 
 ## One Command Dev Start
 

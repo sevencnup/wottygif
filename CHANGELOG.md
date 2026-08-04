@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.26 - 2026-08-04
+
+- Compressed the desktop left control rail so upload, quality, crop controls, summary, and submit actions fit in the fixed viewport.
+- Converted the desktop upload target to a shorter horizontal control.
+- Restored the desktop workspace to a fixed-height shell while keeping the left rail itself non-scrollable.
+
 ## 0.3.25 - 2026-08-04
 
 - Removed the desktop left control rail's independent vertical scrolling.
