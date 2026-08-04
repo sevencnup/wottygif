@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.23 - 2026-08-04
+
+- Moved desktop video cropping into the production preview and mobile video cropping into the source preview, removing both duplicate crop videos.
+- Bound mobile source and desktop/mobile production controls directly to their own preview video elements and playback states.
+- Removed duplicate center-overlay preview buttons and stabilized toolbar icon geometry so controls no longer jump when their icon changes.
+
 ## 0.3.22 - 2026-08-04
 
 - Added automatic cleanup for completed GIF results one hour after their completion time.
