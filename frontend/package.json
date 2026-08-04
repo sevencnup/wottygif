@@ -1,6 +1,6 @@
 {
   "name": "wottygif-frontend",
-  "version": "0.3.0",
+  "version": "0.3.22",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lucide/vue": "^1.28.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "vite": "^6.0.0",
     "vue": "^3.5.22"
-  },
-  "devDependencies": {}
+  }
 }

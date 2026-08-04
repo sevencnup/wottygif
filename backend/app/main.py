@@ -1,19 +1,41 @@
 from __future__ import annotations
 
+import asyncio
 import os
+import json
+import logging
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from uuid import uuid4
+from zipfile import ZIP_STORED, ZipFile
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
+
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    cleanup_expired_results()
+    cleanup_task = asyncio.create_task(cleanup_expired_results_periodically())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
 
 
 class ProcessingMode(str, Enum):
@@ -63,7 +85,7 @@ class MediaJob(BaseModel):
     error_message: str | None = None
 
 
-app = FastAPI(title="WottyGIF API", version="0.3.0")
+app = FastAPI(title="WottyGIF API", version="0.3.22", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -73,6 +95,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5174",
     ],
+    allow_origin_regex=r"http://(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}):517[3-4]",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,16 +104,179 @@ app.add_middleware(
 RESULTS_DIR = Path(__file__).resolve().parents[1] / "data" / "results"
 MAX_FILE_BYTES = 200 * 1024 * 1024
 MAX_ASSETS = 24
+MAX_VIDEO_SECONDS = 30.0
+RESULT_RETENTION = timedelta(hours=1)
+RESULT_CLEANUP_INTERVAL_SECONDS = 60
 QUALITY_SETTINGS = {
-    1: {"max_side": 320, "colors": 64, "fps": 6},
-    2: {"max_side": 480, "colors": 96, "fps": 8},
-    3: {"max_side": 640, "colors": 128, "fps": 10},
-    4: {"max_side": 960, "colors": 192, "fps": 12},
-    5: {"max_side": 1280, "colors": 256, "fps": 15},
+    1: {"max_side": 360, "colors": 128, "fps": 6, "kmeans": 0},
+    2: {"max_side": 540, "colors": 160, "fps": 8, "kmeans": 1},
+    3: {"max_side": 720, "colors": 192, "fps": 10, "kmeans": 1},
+    4: {"max_side": 1080, "colors": 224, "fps": 12, "kmeans": 2},
+    5: {"max_side": 1920, "colors": 256, "fps": 15, "kmeans": 3},
 }
 
 jobs: dict[str, MediaJob] = {}
 result_paths: dict[str, Path] = {}
+
+
+def jobs_metadata_path() -> Path:
+    return RESULTS_DIR / "jobs.json"
+
+
+def persist_jobs() -> None:
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    metadata_path = jobs_metadata_path()
+    temporary_path = metadata_path.with_name(f".{metadata_path.name}.{uuid4().hex}.tmp")
+    payload = [
+        job.model_dump(mode="json")
+        for job in sorted(jobs.values(), key=lambda item: item.created_at, reverse=True)
+    ]
+    try:
+        temporary_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary_path.replace(metadata_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def historical_job(result_path: Path) -> MediaJob:
+    completed_at = datetime.fromtimestamp(result_path.stat().st_mtime, tz=timezone.utc)
+    timestamp = completed_at.astimezone().strftime("%Y%m%d-%H%M%S")
+    return MediaJob(
+        id=result_path.stem,
+        mode=ProcessingMode.single_image,
+        quality=3,
+        source_name=f"历史成品 {completed_at.astimezone().strftime('%Y-%m-%d %H:%M')}",
+        asset_count=0,
+        assets=[],
+        status=JobStatus.completed,
+        created_at=completed_at,
+        completed_at=completed_at,
+        result_name=f"历史成品-{timestamp}.gif",
+        result_url=f"/api/media/jobs/{result_path.stem}/result",
+    )
+
+
+def cleanup_expired_results(
+    now: datetime | None = None,
+    *,
+    save_metadata: bool = True,
+) -> int:
+    current_time = now or datetime.now(timezone.utc)
+    expired_ids: list[str] = []
+
+    for job_id, job in list(jobs.items()):
+        if job.status != JobStatus.completed:
+            continue
+        completed_at = job.completed_at or job.created_at
+        if completed_at.tzinfo is None:
+            completed_at = completed_at.replace(tzinfo=timezone.utc)
+        if current_time - completed_at < RESULT_RETENTION:
+            continue
+
+        result_path = result_paths.get(job_id)
+        if result_path:
+            try:
+                result_path.unlink(missing_ok=True)
+            except OSError:
+                if result_path.exists():
+                    logger.warning("Unable to remove expired GIF result: %s", result_path)
+                    continue
+
+        result_paths.pop(job_id, None)
+        jobs.pop(job_id, None)
+        expired_ids.append(job_id)
+
+    if expired_ids and save_metadata:
+        persist_jobs()
+    if expired_ids:
+        logger.info("Removed %d expired GIF result(s).", len(expired_ids))
+    return len(expired_ids)
+
+
+async def cleanup_expired_results_periodically() -> None:
+    while True:
+        await asyncio.sleep(RESULT_CLEANUP_INTERVAL_SECONDS)
+        try:
+            cleanup_expired_results()
+        except Exception:
+            logger.exception("Periodic GIF result cleanup failed.")
+
+
+def load_persisted_jobs() -> None:
+    jobs.clear()
+    result_paths.clear()
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    metadata_path = jobs_metadata_path()
+
+    if metadata_path.exists():
+        try:
+            payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            payload = []
+        if isinstance(payload, list):
+            for item in payload:
+                try:
+                    job = MediaJob.model_validate(item)
+                except (TypeError, ValueError):
+                    continue
+                result_path = RESULTS_DIR / f"{job.id}.gif"
+                if job.status == JobStatus.completed:
+                    if not result_path.exists():
+                        continue
+                    result_paths[job.id] = result_path
+                elif job.status in {JobStatus.queued, JobStatus.processing}:
+                    job.status = JobStatus.failed
+                    job.error_message = "任务因后端服务重启而中断。"
+                jobs[job.id] = job
+
+    for result_path in RESULTS_DIR.glob("*.gif"):
+        if result_path.stem in jobs:
+            continue
+        job = historical_job(result_path)
+        jobs[job.id] = job
+        result_paths[job.id] = result_path
+
+    cleanup_expired_results(save_metadata=False)
+    persist_jobs()
+
+
+load_persisted_jobs()
+
+
+@dataclass
+class VideoEditOptions:
+    clip_start_seconds: float = 0.0
+    clip_end_seconds: float | None = None
+    crop_left_percent: float = 0.0
+    crop_top_percent: float = 0.0
+    crop_width_percent: float = 100.0
+    crop_height_percent: float = 100.0
+
+    @property
+    def has_crop(self) -> bool:
+        return (
+            abs(self.crop_left_percent) > 1e-6
+            or abs(self.crop_top_percent) > 1e-6
+            or abs(self.crop_width_percent - 100.0) > 1e-6
+            or abs(self.crop_height_percent - 100.0) > 1e-6
+        )
+
+
+@dataclass
+class ImageCropOptions:
+    crop_left_percent: float = 0.0
+    crop_top_percent: float = 0.0
+    crop_width_percent: float = 100.0
+    crop_height_percent: float = 100.0
+
+    @property
+    def has_crop(self) -> bool:
+        return (
+            abs(self.crop_left_percent) > 1e-6
+            or abs(self.crop_top_percent) > 1e-6
+            or abs(self.crop_width_percent - 100.0) > 1e-6
+            or abs(self.crop_height_percent - 100.0) > 1e-6
+        )
 
 
 def asset_kind(upload: UploadFile) -> AssetKind:
@@ -126,6 +312,87 @@ def normalized_origins(origins: list[AssetOrigin], asset_count: int) -> list[Ass
     return origins
 
 
+def build_video_edit_options(
+    mode: ProcessingMode,
+    clip_start_seconds: float | None,
+    clip_end_seconds: float | None,
+    crop_left_percent: float | None,
+    crop_top_percent: float | None,
+    crop_width_percent: float | None,
+    crop_height_percent: float | None,
+) -> VideoEditOptions:
+    if mode != ProcessingMode.video:
+        return VideoEditOptions()
+
+    options = VideoEditOptions(
+        clip_start_seconds=clip_start_seconds or 0.0,
+        clip_end_seconds=clip_end_seconds,
+        crop_left_percent=crop_left_percent or 0.0,
+        crop_top_percent=crop_top_percent or 0.0,
+        crop_width_percent=crop_width_percent or 100.0,
+        crop_height_percent=crop_height_percent or 100.0,
+    )
+
+    if options.clip_end_seconds is not None and options.clip_end_seconds <= options.clip_start_seconds:
+        raise HTTPException(status_code=422, detail="结束时间必须大于开始时间。")
+
+    if options.crop_left_percent + options.crop_width_percent > 100.0 + 1e-6:
+        raise HTTPException(status_code=422, detail="裁剪区域超出画面宽度，请调整左边距或裁剪宽度。")
+
+    if options.crop_top_percent + options.crop_height_percent > 100.0 + 1e-6:
+        raise HTTPException(status_code=422, detail="裁剪区域超出画面高度，请调整上边距或裁剪高度。")
+
+    return options
+
+
+def build_image_crop_options(
+    mode: ProcessingMode,
+    raw_options: str | None,
+    asset_count: int,
+) -> list[ImageCropOptions]:
+    defaults = [ImageCropOptions() for _ in range(asset_count)]
+    if mode == ProcessingMode.video or not raw_options:
+        return defaults
+
+    try:
+        payload = json.loads(raw_options)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail="图片裁剪参数不是有效的 JSON。") from exc
+
+    if not isinstance(payload, list) or len(payload) != asset_count:
+        raise HTTPException(status_code=422, detail="图片裁剪参数数量必须与上传图片数量一致。")
+
+    options: list[ImageCropOptions] = []
+    for index, item in enumerate(payload):
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=422, detail=f"第 {index + 1} 张图片的裁剪参数格式不正确。")
+        if item.get("skip") is True:
+            options.append(ImageCropOptions())
+            continue
+
+        try:
+            crop = ImageCropOptions(
+                crop_left_percent=float(item.get("crop_left_percent", 0)),
+                crop_top_percent=float(item.get("crop_top_percent", 0)),
+                crop_width_percent=float(item.get("crop_width_percent", 100)),
+                crop_height_percent=float(item.get("crop_height_percent", 100)),
+            )
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=f"第 {index + 1} 张图片包含无效裁剪数字。") from exc
+
+        if crop.crop_left_percent < 0 or crop.crop_top_percent < 0:
+            raise HTTPException(status_code=422, detail=f"第 {index + 1} 张图片的裁剪位置不能小于 0。")
+        if not 0 < crop.crop_width_percent <= 100 or not 0 < crop.crop_height_percent <= 100:
+            raise HTTPException(status_code=422, detail=f"第 {index + 1} 张图片的裁剪宽高必须在 0 到 100 之间。")
+        if crop.crop_left_percent + crop.crop_width_percent > 100 + 1e-6:
+            raise HTTPException(status_code=422, detail=f"第 {index + 1} 张图片的裁剪区域超出画面宽度。")
+        if crop.crop_top_percent + crop.crop_height_percent > 100 + 1e-6:
+            raise HTTPException(status_code=422, detail=f"第 {index + 1} 张图片的裁剪区域超出画面高度。")
+        options.append(crop)
+
+    return options
+
+
 async def save_upload(upload: UploadFile, destination: Path) -> int:
     total = 0
     with destination.open("wb") as target:
@@ -137,19 +404,43 @@ async def save_upload(upload: UploadFile, destination: Path) -> int:
     return total
 
 
-def prepare_image(path: Path, max_side: int) -> Image.Image:
+def prepare_image(
+    path: Path,
+    max_side: int,
+    crop_options: ImageCropOptions | None = None,
+) -> Image.Image:
     try:
         with Image.open(path) as source:
             frame = ImageOps.exif_transpose(source).convert("RGB")
+            crop = crop_options or ImageCropOptions()
+            if crop.has_crop:
+                left = min(round(frame.width * crop.crop_left_percent / 100), frame.width - 1)
+                top = min(round(frame.height * crop.crop_top_percent / 100), frame.height - 1)
+                right = round(frame.width * (crop.crop_left_percent + crop.crop_width_percent) / 100)
+                bottom = round(frame.height * (crop.crop_top_percent + crop.crop_height_percent) / 100)
+                right = min(max(right, left + 1), frame.width)
+                bottom = min(max(bottom, top + 1), frame.height)
+                frame = frame.crop((left, top, right, bottom))
             frame.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
             return frame.copy()
     except (UnidentifiedImageError, OSError) as exc:
         raise ValueError(f"无法读取图片 {path.name}") from exc
 
 
-def generate_image_gif(input_paths: list[Path], output_path: Path, quality: int) -> None:
+def generate_image_gif(
+    input_paths: list[Path],
+    output_path: Path,
+    quality: int,
+    crop_options: list[ImageCropOptions] | None = None,
+) -> None:
     settings = QUALITY_SETTINGS[quality]
-    source_frames = [prepare_image(path, settings["max_side"]) for path in input_paths]
+    options = crop_options or [ImageCropOptions() for _ in input_paths]
+    if len(options) != len(input_paths):
+        raise ValueError("图片裁剪参数数量与输入图片数量不一致。")
+    source_frames = [
+        prepare_image(path, settings["max_side"], crop)
+        for path, crop in zip(input_paths, options)
+    ]
     target_width = max(frame.width for frame in source_frames)
     target_height = max(frame.height for frame in source_frames)
     frames: list[Image.Image] = []
@@ -162,7 +453,8 @@ def generate_image_gif(input_paths: list[Path], output_path: Path, quality: int)
             canvas.quantize(
                 colors=settings["colors"],
                 method=Image.Quantize.MEDIANCUT,
-                dither=Image.Dither.FLOYDSTEINBERG,
+                kmeans=settings["kmeans"],
+                dither=Image.Dither.NONE,
             )
         )
 
@@ -173,7 +465,7 @@ def generate_image_gif(input_paths: list[Path], output_path: Path, quality: int)
         append_images=frames[1:],
         duration=700,
         loop=0,
-        optimize=True,
+        optimize=False,
         disposal=2,
     )
 
@@ -186,26 +478,116 @@ def find_ffmpeg() -> str:
     return executable
 
 
-def generate_video_gif(input_path: Path, output_path: Path, quality: int) -> None:
-    settings = QUALITY_SETTINGS[quality]
-    video_filter = (
-        f"fps={settings['fps']},scale='min({settings['max_side']},iw)':-2:flags=lanczos,"
-        f"split[source][palette_input];[palette_input]palettegen=max_colors={settings['colors']}[palette];"
-        "[source][palette]paletteuse=dither=sierra2_4a"
-    )
+def find_ffprobe() -> str:
+    configured = os.environ.get("WOTTYGIF_FFPROBE")
+    executable = configured or shutil.which("ffprobe")
+    if executable:
+        return executable
+
+    ffmpeg_path = Path(find_ffmpeg())
+    sibling = ffmpeg_path.with_name("ffprobe.exe" if os.name == "nt" else "ffprobe")
+    if sibling.exists():
+        return str(sibling)
+    raise RuntimeError("未找到 FFprobe，请安装后加入 PATH，或设置 WOTTYGIF_FFPROBE。")
+
+
+def probe_video_duration(input_path: Path) -> float:
     completed = subprocess.run(
         [
-            find_ffmpeg(),
-            "-hide_banner",
-            "-loglevel",
+            find_ffprobe(),
+            "-v",
             "error",
-            "-y",
-            "-i",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
             str(input_path),
-            "-vf",
-            video_filter,
-            str(output_path),
         ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or "无法读取视频时长。"
+        raise ValueError(detail[-600:])
+    try:
+        return float(completed.stdout.strip())
+    except ValueError as exc:
+        raise ValueError("无法读取视频时长。") from exc
+
+
+def resolve_video_clip(duration: float, options: VideoEditOptions) -> tuple[float, float]:
+    if options.clip_start_seconds >= duration - 0.05:
+        raise ValueError(f"开始时间 {options.clip_start_seconds:.2f} 秒已超出视频时长 {duration:.2f} 秒。")
+
+    clip_end_seconds = options.clip_end_seconds if options.clip_end_seconds is not None else duration
+    if clip_end_seconds > duration + 0.05:
+        raise ValueError(f"结束时间 {clip_end_seconds:.2f} 秒超出视频时长 {duration:.2f} 秒。")
+
+    clip_duration = clip_end_seconds - options.clip_start_seconds
+    if clip_duration <= 0.05:
+        raise ValueError("截取时长至少需要大于 0.05 秒。")
+    if clip_duration > MAX_VIDEO_SECONDS + 0.05:
+        raise ValueError(f"当前截取片段为 {clip_duration:.1f} 秒，最长支持 30 秒，请缩短后重试。")
+
+    return clip_end_seconds, clip_duration
+
+
+def build_video_filter(quality: int, options: VideoEditOptions) -> str:
+    settings = QUALITY_SETTINGS[quality]
+    filter_steps: list[str] = []
+    if options.has_crop:
+        filter_steps.append(
+            "crop="
+            f"'floor(iw*{options.crop_width_percent / 100:.6f}/2)*2':"
+            f"'floor(ih*{options.crop_height_percent / 100:.6f}/2)*2':"
+            f"'floor(iw*{options.crop_left_percent / 100:.6f}/2)*2':"
+            f"'floor(ih*{options.crop_top_percent / 100:.6f}/2)*2'"
+        )
+
+    filter_steps.extend(
+        [
+            f"fps={settings['fps']}",
+            f"scale='min({settings['max_side']},iw)':-2:flags=lanczos",
+        ]
+    )
+    return (
+        ",".join(filter_steps)
+        + ","
+        f"split[source][palette_input];[palette_input]palettegen=max_colors={settings['colors']}:"
+        "reserve_transparent=0:stats_mode=full[palette];"
+        "[source][palette]paletteuse=dither=none"
+    )
+
+
+def generate_video_gif(
+    input_path: Path,
+    output_path: Path,
+    quality: int,
+    options: VideoEditOptions | None = None,
+) -> None:
+    edit_options = options or VideoEditOptions()
+    duration = probe_video_duration(input_path)
+    _, clip_duration = resolve_video_clip(duration, edit_options)
+    video_filter = build_video_filter(quality, edit_options)
+    command = [
+        find_ffmpeg(),
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(input_path),
+    ]
+    if edit_options.clip_start_seconds > 0:
+        command.extend(["-ss", f"{edit_options.clip_start_seconds:.3f}"])
+    command.extend(["-t", f"{clip_duration:.3f}", "-vf", video_filter, str(output_path)])
+
+    completed = subprocess.run(
+        command,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -240,10 +622,27 @@ async def create_media_job(
     mode: ProcessingMode = Form(...),
     quality: int = Form(..., ge=1, le=5),
     origins: list[AssetOrigin] = Form(...),
+    clip_start_seconds: float | None = Form(None, ge=0),
+    clip_end_seconds: float | None = Form(None, gt=0),
+    crop_left_percent: float | None = Form(None, ge=0, le=100),
+    crop_top_percent: float | None = Form(None, ge=0, le=100),
+    crop_width_percent: float | None = Form(None, gt=0, le=100),
+    crop_height_percent: float | None = Form(None, gt=0, le=100),
+    image_crop_options: str | None = Form(None),
     files: list[UploadFile] = File(...),
 ) -> MediaJob:
     kinds = validate_uploads(mode, files)
     asset_origins = normalized_origins(origins, len(files))
+    video_edit_options = build_video_edit_options(
+        mode,
+        clip_start_seconds,
+        clip_end_seconds,
+        crop_left_percent,
+        crop_top_percent,
+        crop_width_percent,
+        crop_height_percent,
+    )
+    image_edit_options = build_image_crop_options(mode, image_crop_options, len(files))
     job_id = uuid4().hex
     names = [Path(upload.filename or "asset").name for upload in files]
     assets = [
@@ -273,6 +672,7 @@ async def create_media_job(
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = RESULTS_DIR / f"{job_id}.gif"
+    persist_jobs()
 
     try:
         with TemporaryDirectory(prefix="wottygif-") as temp_dir:
@@ -285,32 +685,86 @@ async def create_media_job(
                 input_paths.append(input_path)
 
             if mode == ProcessingMode.video:
-                generate_video_gif(input_paths[0], output_path, quality)
+                generate_video_gif(input_paths[0], output_path, quality, video_edit_options)
             else:
-                generate_image_gif(input_paths, output_path, quality)
+                generate_image_gif(input_paths, output_path, quality, image_edit_options)
 
         result_paths[job_id] = output_path
         job.status = JobStatus.completed
         job.completed_at = datetime.now(timezone.utc)
         job.result_url = f"/api/media/jobs/{job_id}/result"
+        persist_jobs()
     except HTTPException:
         jobs.pop(job_id, None)
+        persist_jobs()
         raise
     except Exception as exc:
         output_path.unlink(missing_ok=True)
         job.status = JobStatus.failed
         job.error_message = str(exc)
+        persist_jobs()
 
     return job
 
 
 @app.get("/api/media/jobs", response_model=list[MediaJob])
 def list_media_jobs() -> list[MediaJob]:
+    cleanup_expired_results()
     return sorted(jobs.values(), key=lambda job: job.created_at, reverse=True)
+
+
+def archive_name(filename: str, used_names: set[str]) -> str:
+    safe_name = Path(filename).name or "wottygif.gif"
+    candidate = safe_name
+    index = 2
+    while candidate.lower() in used_names:
+        path = Path(safe_name)
+        candidate = f"{path.stem}-{index}{path.suffix}"
+        index += 1
+    used_names.add(candidate.lower())
+    return candidate
+
+
+@app.get("/api/media/jobs/batch-download")
+def batch_download_results() -> FileResponse:
+    cleanup_expired_results()
+    completed_results = [
+        (job, result_paths[job.id])
+        for job in sorted(jobs.values(), key=lambda item: item.created_at)
+        if job.status == JobStatus.completed
+        and job.id in result_paths
+        and result_paths[job.id].exists()
+    ]
+    if not completed_results:
+        raise HTTPException(status_code=409, detail="当前没有可下载的 GIF 成品。")
+
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(prefix="wottygif-batch-", suffix=".zip", dir=RESULTS_DIR, delete=False) as temporary:
+        archive_path = Path(temporary.name)
+
+    used_names: set[str] = set()
+    try:
+        with ZipFile(archive_path, "w", compression=ZIP_STORED) as archive:
+            for job, result_path in completed_results:
+                archive.write(
+                    result_path,
+                    archive_name(job.result_name or f"{job.id}.gif", used_names),
+                )
+    except Exception:
+        archive_path.unlink(missing_ok=True)
+        raise
+
+    return FileResponse(
+        archive_path,
+        media_type="application/zip",
+        filename="wottygif-results.zip",
+        background=BackgroundTask(archive_path.unlink, missing_ok=True),
+    )
 
 
 @app.get("/api/media/jobs/{job_id}/result")
 def get_media_result(job_id: str) -> FileResponse:
+    cleanup_expired_results()
     job = jobs.get(job_id)
     result_path = result_paths.get(job_id)
     if not job:

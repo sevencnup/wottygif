@@ -8,6 +8,12 @@ $backendLog = Join-Path $repoRoot 'backend-dev.log'
 $backendErrLog = Join-Path $repoRoot 'backend-dev.err.log'
 $backendCommand = $null
 $backendArguments = @('-m', 'uvicorn', 'app.main:app', '--reload', '--host', '127.0.0.1', '--port', '8000')
+$lanAddress = [System.Net.Dns]::GetHostAddresses([System.Net.Dns]::GetHostName()) |
+  Where-Object {
+    $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and
+    -not $_.IPAddressToString.StartsWith('127.')
+  } |
+  Select-Object -First 1
 
 if (Test-Path -LiteralPath $backendPython) {
   $backendCommand = $backendPython
@@ -76,7 +82,11 @@ try {
   }
 
   Write-Host "Backend is ready."
-  Write-Host "Frontend starting on http://127.0.0.1:5173"
+  Write-Host "Frontend starting on http://0.0.0.0:5173"
+  Write-Host "Local URL: http://127.0.0.1:5173"
+  if ($lanAddress) {
+    Write-Host "LAN URL: http://$($lanAddress.IPAddressToString):5173"
+  }
   & pnpm --dir $frontendRoot dev
 }
 finally {
