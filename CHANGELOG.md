@@ -4,6 +4,10 @@
 
 - Replaced the redundant mobile configure-page bottom CTA `进入预览` with `确认裁剪`; the clear button is unchanged.
 - Confirm crop applies the current video crop or confirms the current image crop from the bottom action bar.
+- Removed the duplicate skip/confirm buttons from the mobile image crop editor, leaving navigation above and a single confirm action in the bottom bar.
+- Scroll the mobile configure page to the bottom automatically when a success message appears so the message is never hidden behind the fixed bottom action bar.
+- Added a little extra bottom padding to the mobile page body so scrolled content clears the fixed bottom action bar.
+- Show a decode-failure notice in place of mobile video previews when the browser cannot play the uploaded video (for example H.265/HEVC phone recordings), while the GIF job still works.
 ## 0.3.28 - 2026-08-07
 
 - Made the mobile image crop stage smaller so portrait images no longer fill the screen and leave wide scrollable gutters on either side.

@@ -69,6 +69,7 @@ const imageCropStates = ref({})
 const imageCropDraft = ref({ left: 0, top: 0, width: 100, height: 100 })
 const imageCropDirty = ref(false)
 const assetAspectRatios = ref({})
+const videoDecodeErrors = ref({})
 const assets = ref([])
 const parkedAssetGroups = {
   image: { assets: [], selectedAssetId: '' },
@@ -91,6 +92,12 @@ const MOBILE_PAGES = new Set(['home', 'configure', 'preview', 'jobs', 'detail'])
 
 const isMobileViewport = () =>
   window.matchMedia('(max-width: 760px), ((max-height: 520px) and (pointer: coarse))').matches
+
+const videoDecodeFailed = (assetId) => videoDecodeErrors.value[assetId] || false
+
+const handleVideoDecodeError = (assetId) => {
+  videoDecodeErrors.value = { ...videoDecodeErrors.value, [assetId]: true }
+}
 
 const setMobilePage = (nextPage, { replace = false } = {}) => {
   if (!MOBILE_PAGES.has(nextPage) || mobilePage.value === nextPage) {
@@ -698,6 +705,14 @@ const moveToImageCropAsset = (assetId) => {
   return true
 }
 
+const scrollMobileMessageIntoView = async () => {
+  if (!isMobileViewport() || mobilePage.value !== 'configure') {
+    return
+  }
+  await nextTick()
+  document.querySelector('.mobile-page-body')?.scrollTo({ top: document.querySelector('.mobile-page-body').scrollHeight, behavior: 'smooth' })
+}
+
 const moveAfterImageCrop = () => {
   const currentIndex = selectedAssetIndex.value
   const immediateNext = imageAssets.value[currentIndex + 1]
@@ -711,6 +726,7 @@ const moveAfterImageCrop = () => {
   } else {
     imageCropEditorOpen.value = false
     queueMessage.value = '全部图片裁剪已处理，可以进入预览。'
+    scrollMobileMessageIntoView()
   }
 }
 
@@ -851,6 +867,9 @@ const resetAssets = (options = { clearMessage: true }) => {
   if (options.clearMessage) {
     queueMessage.value = ''
   }
+  videoDecodeErrors.value = Object.fromEntries(
+    Object.entries(videoDecodeErrors.value).filter(([assetId]) => !removedIds.has(assetId))
+  )
 }
 
 const refreshJobs = async () => {
@@ -1268,6 +1287,7 @@ const submitJob = async () => {
 
     queueMessage.value = `已生成 ${createdJobs.length} 个 GIF 成品。`
     resetAssets({ clearMessage: false })
+    scrollMobileMessageIntoView()
     await checkHealth()
     if (createdJobs.length === 1) {
       selectedJobId.value = createdJobs[0].id
@@ -2018,7 +2038,12 @@ onBeforeUnmount(() => {
                   @play="syncVideoPlaybackState($event, 'mobile-source')"
                   @pause="stopVideoPlaybackState('mobile-source')"
                   @ended="stopVideoPlaybackState('mobile-source')"
+                  @error="handleVideoDecodeError(previewAsset.id)"
                 ></video>
+                <div v-if="videoDecodeFailed(previewAsset.id)" class="media-decode-warning">
+                  <strong>无法预览此视频</strong>
+                  <span>浏览器不支持该视频编码（如手机拍摄的 H.265/HEVC 视频），仍可直接生成 GIF。</span>
+                </div>
                 <div
                   v-if="previewAsset.kind === 'video' && videoCropEditorOpen"
                   class="crop-box"
@@ -2165,12 +2190,6 @@ onBeforeUnmount(() => {
                 @click="moveImageCropBy(1)"
               >
                 下一张
-              </button>
-            </div>
-            <div class="image-crop-actions">
-              <button type="button" @click="skipCurrentImageCrop">跳过此张</button>
-              <button class="confirm" type="button" @click="confirmCurrentImageCrop">
-                {{ selectedAssetIndex < imageAssets.length - 1 ? '确认并下一张' : '确认裁剪' }}
               </button>
             </div>
           </section>
@@ -2366,7 +2385,12 @@ onBeforeUnmount(() => {
                 @play="syncVideoPlaybackState($event, 'mobile-preview')"
                 @pause="stopVideoPlaybackState('mobile-preview')"
                 @ended="stopVideoPlaybackState('mobile-preview')"
+                @error="handleVideoDecodeError(previewAsset.id)"
               ></video>
+              <div v-if="videoDecodeFailed(previewAsset.id)" class="media-decode-warning">
+                <strong>无法预览此视频</strong>
+                <span>浏览器不支持该视频编码，仍可直接生成 GIF。</span>
+              </div>
             </template>
             <div v-else class="empty-preview">
               <span class="empty-mark" aria-hidden="true"></span>
