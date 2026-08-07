@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.29 - 2026-08-07
+
+- Replaced the redundant mobile configure-page bottom CTA `进入预览` with `确认裁剪`; the clear button is unchanged.
+- Confirm crop applies the current video crop or confirms the current image crop from the bottom action bar.
+## 0.3.28 - 2026-08-07
+
+- Made the mobile image crop stage smaller so portrait images no longer fill the screen and leave wide scrollable gutters on either side.
+- Let vertical scrolling pass through the image and video crop surfaces (only the crop box and its handles keep exclusive touch handling), so the configure page stays scrollable while cropping.
+- Removed the upward gray shadow on the mobile bottom action bar and bottom navigation that dimmed and obscured scrolling content behind them.
+- Replaced the mobile configure-page bottom "enter preview" action with a crop confirmation button because the crop editor already shows the previewed media, while keeping the clear-assets action and the top-bar preview shortcut.
+
 ## 0.3.27 - 2026-08-04
 
 - Focused the mobile asset workspace immediately after video or image upload so editing is visible without returning to the upload prompt.

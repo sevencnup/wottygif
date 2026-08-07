@@ -317,7 +317,7 @@ const stageStyleForRatio = (ratio, maxHeight, minWidth = 144) => ({
   width: ratio < 1 ? `min(100%, ${Math.max(minWidth, Math.round(maxHeight * ratio))}px)` : '100%'
 })
 
-const imageCropEditorStyle = computed(() => stageStyleForRatio(currentAssetRatio.value, 420))
+const imageCropEditorStyle = computed(() => stageStyleForRatio(currentAssetRatio.value, 300))
 const desktopImageCropStageStyle = computed(() => ({
   aspectRatio: `${currentAssetRatio.value}`,
   width: `min(100%, ${currentAssetRatio.value * 100}cqh)`
@@ -1103,6 +1103,20 @@ const openPreviewPage = () => {
   }
   errorMessage.value = ''
   setMobilePage('preview')
+}
+
+const confirmMobileCrop = () => {
+  if (!assets.value.length || !previewAsset.value) {
+    return
+  }
+  if (mode.value === 'video') {
+    if (previewAsset.value.kind !== 'video') {
+      return
+    }
+    confirmCrop()
+    return
+  }
+  confirmCurrentImageCrop()
 }
 
 const openMobileVideoEditor = async () => {
@@ -2304,7 +2318,7 @@ onBeforeUnmount(() => {
 
         <div class="mobile-bottom-cta">
           <button class="ghost-button" type="button" :disabled="!assets.length" @click="resetAssets">清空</button>
-          <button class="primary-button" type="button" @click="openPreviewPage">进入预览</button>
+          <button class="primary-button" type="button" :disabled="!assets.length" @click="confirmMobileCrop">确认裁剪</button>
         </div>
       </section>
 

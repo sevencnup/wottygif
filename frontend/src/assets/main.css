@@ -470,7 +470,7 @@ h1 {
 }
 
 .video-crop-stage {
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
 }
 
@@ -712,7 +712,7 @@ h1 {
   margin: 0 auto;
   overflow: hidden;
   background: #11131a;
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
 }
 
@@ -1860,7 +1860,6 @@ h1 {
     12px
     max(12px, calc(env(safe-area-inset-bottom) + 8px));
   background: #ffffff;
-  box-shadow: 0 -10px 24px rgba(44, 51, 73, 0.07);
 }
 
 .mobile-bottom-cta.single {
@@ -2017,7 +2016,6 @@ h1 {
     16px
     max(10px, calc(env(safe-area-inset-bottom) + 6px));
   background: #ffffff;
-  box-shadow: 0 -12px 30px rgba(44, 51, 73, 0.08);
 }
 
 .mobile-tab {
