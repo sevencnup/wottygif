@@ -1415,7 +1415,7 @@ h1 {
   width: 100%;
   overflow: hidden;
   overscroll-behavior-x: none;
-  background: var(--page);
+  background: #ffffff;
 }
 
 .mobile-page-body {
@@ -1428,7 +1428,8 @@ h1 {
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  padding: 14px 12px 24px;
+  background: #ffffff;
+  padding: 14px 12px 32px;
 }
 
 .mobile-home .mobile-page-body {
@@ -1437,6 +1438,7 @@ h1 {
 
 .mobile-section {
   gap: 12px;
+  background: #ffffff;
 }
 
 .mobile-mode-list,
