@@ -768,10 +768,6 @@ h1 {
   gap: 8px;
 }
 
-.crop-row {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
 .number-field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1839,12 +1835,6 @@ h1 {
   font-weight: 700;
 }
 
-.crop-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 14px;
-}
-
 .mobile-crop-editor {
   width: 100%;
   padding: 14px 12px;
@@ -2225,10 +2215,6 @@ h1 {
     gap: 6px;
   }
 
-  .crop-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
   .number-field {
     gap: 3px 5px;
   }
@@ -2479,10 +2465,6 @@ h1 {
   .video-edit-row {
     gap: 6px;
     margin-top: 6px;
-  }
-
-  .crop-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .number-field {
@@ -2778,10 +2760,6 @@ h1 {
   .video-edit-row {
     gap: 5px;
     margin-top: 4px;
-  }
-
-  .crop-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .number-field {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.31 - 2026-08-19
+
+- Removed the four numeric crop inputs (左侧位置 / 顶部位置 / 裁剪宽度 / 裁剪高度) from the video crop editor on both desktop and mobile; size and position are now adjusted with the width/height sliders and the draggable crop box.
+
 ## 0.3.30 - 2026-08-19
 
 - Removed the middle "取消修改/确认裁剪" button pair from the mobile video crop editor; confirming the crop is now handled solely by the bottom "确认裁剪" action.

@@ -1523,28 +1523,6 @@ onBeforeUnmount(() => {
               </label>
             </div>
 
-            <div v-if="videoCropEditorOpen" class="video-edit-row crop-row">
-              <label class="number-field">
-                <span>左侧位置</span>
-                <input v-model="cropLeftPercent" type="number" min="0" max="100" step="1" inputmode="decimal" @change="constrainCropFields" />
-                <small>%</small>
-              </label>
-              <label class="number-field">
-                <span>顶部位置</span>
-                <input v-model="cropTopPercent" type="number" min="0" max="100" step="1" inputmode="decimal" @change="constrainCropFields" />
-                <small>%</small>
-              </label>
-              <label class="number-field">
-                <span>裁剪宽度</span>
-                <input v-model="cropWidthPercent" type="number" min="1" :max="cropWidthMax" step="1" inputmode="decimal" @change="constrainCropFields" />
-                <small>%</small>
-              </label>
-              <label class="number-field">
-                <span>裁剪高度</span>
-                <input v-model="cropHeightPercent" type="number" min="1" :max="cropHeightMax" step="1" inputmode="decimal" @change="constrainCropFields" />
-                <small>%</small>
-              </label>
-            </div>
           </div>
 
           <div v-else class="image-edit-panel">
@@ -2233,28 +2211,7 @@ onBeforeUnmount(() => {
                   <output>{{ cropBox.height }}%</output>
                 </label>
               </div>
-              <div v-if="videoCropEditorOpen" class="crop-grid">
-                <label class="number-field">
-                  <span>左侧位置</span>
-                  <input v-model="cropLeftPercent" type="number" min="0" max="100" step="1" inputmode="decimal" @change="constrainCropFields" />
-                  <small>%</small>
-                </label>
-                <label class="number-field">
-                  <span>顶部位置</span>
-                  <input v-model="cropTopPercent" type="number" min="0" max="100" step="1" inputmode="decimal" @change="constrainCropFields" />
-                  <small>%</small>
-                </label>
-                <label class="number-field">
-                  <span>裁剪宽度</span>
-                  <input v-model="cropWidthPercent" type="number" min="1" :max="cropWidthMax" step="1" inputmode="decimal" @change="constrainCropFields" />
-                  <small>%</small>
-                </label>
-                <label class="number-field">
-                  <span>裁剪高度</span>
-                  <input v-model="cropHeightPercent" type="number" min="1" :max="cropHeightMax" step="1" inputmode="decimal" @change="constrainCropFields" />
-                  <small>%</small>
-                </label>
-              </div>
+
             </div>
           </section>
 
