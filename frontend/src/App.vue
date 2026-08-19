@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { CircleCheckBig, House, Maximize2, Pause, Play } from '@lucide/vue'
 import { createMediaJob, getHealth, listMediaJobs, resolveApiUrl } from './api/client.js'
 
@@ -34,7 +34,9 @@ const QUALITY_OPTIONS = [
 const FPS_OPTIONS = [
   { value: 'auto', label: '跟随质量' },
   { value: '6', label: '6 FPS' },
+  { value: '8', label: '8 FPS' },
   { value: '10', label: '10 FPS' },
+  { value: '12', label: '12 FPS' },
   { value: '15', label: '15 FPS' }
 ]
 
@@ -51,6 +53,14 @@ const fpsSetting = ref('auto')
 const loopSetting = ref('forever')
 const clipStartSeconds = ref('0')
 const clipEndSeconds = ref('')
+const defaultFpsForQuality = (qualityValue) => ({ 1: 6, 2: 8, 3: 10, 4: 12, 5: 15 })[qualityValue] ?? 10
+const resolvedFps = computed(() => {
+  const selected = Number(fpsSetting.value)
+  return fpsSetting.value !== 'auto' && Number.isFinite(selected) && selected > 0
+    ? selected
+    : defaultFpsForQuality(quality.value)
+})
+const imagePlaybackDelay = computed(() => Math.max(50, Math.round(1000 / resolvedFps.value)))
 const cropLeftPercent = ref('0')
 const cropTopPercent = ref('0')
 const cropWidthPercent = ref('100')
@@ -63,6 +73,7 @@ const videoProgressStates = ref({})
 const desktopPreviewVideo = ref(null)
 const mobileSourceVideo = ref(null)
 const mobilePreviewVideo = ref(null)
+const imagePlaybackPlaying = ref(false)
 const imageCropActive = ref(false)
 const imageCropEditorOpen = ref(false)
 const imageCropStates = ref({})
@@ -87,6 +98,19 @@ let assetSequence = 0
 let jobsRefreshTimer = null
 let cropInteraction = null
 let imageCropInteraction = null
+let imagePlaybackTimer = null
+
+const clearImagePlaybackTimer = () => {
+  if (imagePlaybackTimer) {
+    window.clearInterval(imagePlaybackTimer)
+    imagePlaybackTimer = null
+  }
+}
+
+const stopImagePlayback = () => {
+  clearImagePlaybackTimer()
+  imagePlaybackPlaying.value = false
+}
 
 const MOBILE_PAGES = new Set(['home', 'configure', 'preview', 'jobs', 'detail'])
 
@@ -104,6 +128,9 @@ const setMobilePage = (nextPage, { replace = false } = {}) => {
     return
   }
 
+  if (nextPage !== 'preview') {
+    stopImagePlayback()
+  }
   mobilePage.value = nextPage
   if (!isMobileViewport()) {
     return
@@ -219,7 +246,7 @@ const submitHint = computed(() => {
   return '可以直接生成 GIF。'
 })
 
-const currentFpsLabel = computed(() => (quality.value <= 2 ? '6 FPS' : quality.value === 3 ? '10 FPS' : '12 FPS'))
+const currentFpsLabel = computed(() => `${resolvedFps.value} FPS`)
 
 const clipBounds = (mediaDuration = 0) => {
   const rawStart = Number(clipStartSeconds.value || 0)
@@ -251,15 +278,21 @@ const videoProgress = (surface) => {
 
 const videoClipLabel = (surface) => {
   if (mode.value !== 'video') {
-    return '00:00 / 00:03'
+    return assets.value.length ? `第 ${selectedAssetIndex.value + 1} / ${assets.value.length} 帧` : '暂无帧'
   }
   const progress = videoProgress(surface)
   return `${formatPlaybackTime(progress.elapsed)} / ${formatPlaybackTime(progress.duration)}`
 }
 
-const videoTimelineStyle = (surface) => ({
-  width: `${videoProgress(surface).percent}%`
-})
+const videoTimelineStyle = (surface) => {
+  if (mode.value !== 'video') {
+    const percent = assets.value.length > 0
+      ? ((selectedAssetIndex.value + 1) / assets.value.length) * 100
+      : 0
+    return { width: `${percent}%` }
+  }
+  return { width: `${videoProgress(surface).percent}%` }
+}
 
 const cropSummary = computed(() => {
   if (mode.value !== 'video') {
@@ -339,6 +372,14 @@ const currentImageCropState = computed(() => {
 
 const showImageCropEditor = computed(
   () => imageCropActive.value && imageCropEditorOpen.value && previewAsset.value?.kind === 'image'
+)
+
+const imagePreviewPlayable = computed(
+  () => mode.value === 'multi_image' && assets.value.length > 1 && !showImageCropEditor.value
+)
+
+const previewPlaybackAvailable = computed(() =>
+  mode.value === 'video' ? previewAsset.value?.kind === 'video' : imagePreviewPlayable.value
 )
 
 const appliedPreviewCrop = computed(() => {
@@ -520,6 +561,49 @@ const stopVideoPlaybackState = (surface) => {
   setVideoPlaybackState(surface, false)
 }
 
+const advanceImagePreview = () => {
+  if (!imagePreviewPlayable.value) {
+    stopImagePlayback()
+    return
+  }
+  const nextIndex = (selectedAssetIndex.value + 1) % assets.value.length
+  selectedAssetId.value = assets.value[nextIndex].id
+}
+
+const startImagePlayback = () => {
+  if (!imagePreviewPlayable.value) {
+    stopImagePlayback()
+    return
+  }
+  videoRefs.forEach((videoRef) => {
+    if (videoRef.value && !videoRef.value.paused) {
+      videoRef.value.pause()
+    }
+  })
+  clearImagePlaybackTimer()
+  imagePlaybackPlaying.value = true
+  imagePlaybackTimer = window.setInterval(advanceImagePreview, imagePlaybackDelay.value)
+}
+
+const toggleImagePlayback = () => {
+  if (imagePlaybackPlaying.value) {
+    stopImagePlayback()
+  } else {
+    startImagePlayback()
+  }
+}
+
+const isPreviewPlaying = (surface) =>
+  mode.value === 'video' ? isVideoPlaying(surface) : imagePlaybackPlaying.value
+
+const togglePreviewPlayback = (video, surface) => {
+  if (mode.value === 'video') {
+    toggleVideoPlayback(video, surface)
+  } else {
+    toggleImagePlayback()
+  }
+}
+
 const toggleVideoPlayback = (video, surface) => {
   if (!video) {
     return
@@ -539,6 +623,14 @@ const toggleVideoPlayback = (video, surface) => {
 
   video.pause()
 }
+
+watch([imagePlaybackDelay, imagePreviewPlayable], ([, canPlay]) => {
+  if (!canPlay) {
+    stopImagePlayback()
+  } else if (imagePlaybackPlaying.value) {
+    startImagePlayback()
+  }
+})
 
 const startCropInteraction = (event, handle) => {
   if (event.button !== undefined && event.button !== 0) {
@@ -849,6 +941,7 @@ const cleanupAssetUrl = (asset) => {
 }
 
 const resetAssets = (options = { clearMessage: true }) => {
+  stopImagePlayback()
   const removedIds = new Set(assets.value.map((asset) => asset.id))
   assets.value.forEach(cleanupAssetUrl)
   assets.value = []
@@ -1014,6 +1107,7 @@ const handlePickerAreaClick = (event) => {
 }
 
 const removeAsset = (assetId) => {
+  stopImagePlayback()
   const removedIndex = assets.value.findIndex((item) => item.id === assetId)
   const asset = assets.value.find((item) => item.id === assetId)
   if (asset) {
@@ -1041,6 +1135,7 @@ const removeAsset = (assetId) => {
 }
 
 const selectAsset = (assetId) => {
+  stopImagePlayback()
   if (imageCropActive.value && mode.value !== 'video') {
     moveToImageCropAsset(assetId)
     return
@@ -1065,6 +1160,7 @@ const moveSelectedAsset = (offset) => {
 }
 
 const applyModeRules = (nextMode) => {
+  stopImagePlayback()
   const previousKind = mode.value === 'video' ? 'video' : 'image'
   const nextKind = nextMode === 'video' ? 'video' : 'image'
   const hadCurrentAssets = assets.value.length > 0
@@ -1193,6 +1289,7 @@ const buildImageCropOptions = (selectedAssets) => {
 const createPayloadForAssets = (selectedAssets) => ({
   mode: mode.value,
   quality: quality.value,
+  fps: mode.value !== 'video' && fpsSetting.value !== 'auto' ? resolvedFps.value : null,
   assets: selectedAssets,
   videoOptions: mode.value === 'video' ? buildVideoOptions() : null,
   imageCropOptions: mode.value !== 'video' ? buildImageCropOptions(selectedAssets) : null
@@ -1363,6 +1460,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopImagePlayback()
   window.removeEventListener('pointermove', moveCropInteraction)
   window.removeEventListener('pointerup', finishCropInteraction)
   window.removeEventListener('pointercancel', finishCropInteraction)
@@ -1601,7 +1699,7 @@ onBeforeUnmount(() => {
             <div class="settings-grid">
               <label class="select-field">
                 <span>帧率 (FPS)</span>
-                <select v-model="fpsSetting" disabled>
+                <select v-model="fpsSetting">
                   <option v-for="option in FPS_OPTIONS" :key="option.value" :value="option.value">
                     {{ option.label }}
                   </option>
@@ -1750,15 +1848,16 @@ onBeforeUnmount(() => {
             <button
               class="icon-button"
               type="button"
-              :aria-label="isVideoPlaying('desktop-preview') ? '预览暂停' : '预览播放'"
-              @click="toggleVideoPlayback(desktopPreviewVideo, 'desktop-preview')"
+              :disabled="!previewPlaybackAvailable"
+              :aria-label="isPreviewPlaying('desktop-preview') ? '预览暂停' : '预览播放'"
+              @click="togglePreviewPlayback(desktopPreviewVideo, 'desktop-preview')"
             >
-              <Pause v-if="isVideoPlaying('desktop-preview')" :size="18" :stroke-width="2.4" aria-hidden="true" />
+              <Pause v-if="isPreviewPlaying('desktop-preview')" :size="18" :stroke-width="2.4" aria-hidden="true" />
               <Play v-else :size="18" :stroke-width="2.4" aria-hidden="true" />
             </button>
             <span class="time-label">{{ videoClipLabel('desktop-preview') }}</span>
             <div class="timeline" aria-hidden="true"><span :style="videoTimelineStyle('desktop-preview')"></span></div>
-            <strong>{{ quality <= 2 ? '6 FPS' : quality === 3 ? '10 FPS' : '12 FPS' }}</strong>
+            <strong>{{ currentFpsLabel }}</strong>
             <button class="icon-button" type="button" aria-label="全屏预览">
               <Maximize2 :size="17" :stroke-width="2.3" aria-hidden="true" />
             </button>
@@ -2260,7 +2359,11 @@ onBeforeUnmount(() => {
             <div class="mobile-setting-list">
               <div class="mobile-setting-row">
                 <span>帧率</span>
-                <strong>{{ currentFpsLabel }}</strong>
+                <select v-model="fpsSetting" aria-label="帧率">
+                  <option v-for="option in FPS_OPTIONS" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
               </div>
               <div class="mobile-setting-row">
                 <span>循环次数</span>
@@ -2357,10 +2460,11 @@ onBeforeUnmount(() => {
             <button
               class="nav-icon compact"
               type="button"
-              :aria-label="isVideoPlaying('mobile-preview') ? '预览暂停' : '预览播放'"
-              @click="toggleVideoPlayback(mobilePreviewVideo, 'mobile-preview')"
+              :disabled="!previewPlaybackAvailable"
+              :aria-label="isPreviewPlaying('mobile-preview') ? '预览暂停' : '预览播放'"
+              @click="togglePreviewPlayback(mobilePreviewVideo, 'mobile-preview')"
             >
-              <Pause v-if="isVideoPlaying('mobile-preview')" :size="17" :stroke-width="2.4" aria-hidden="true" />
+              <Pause v-if="isPreviewPlaying('mobile-preview')" :size="17" :stroke-width="2.4" aria-hidden="true" />
               <Play v-else :size="17" :stroke-width="2.4" aria-hidden="true" />
             </button>
             <span>{{ videoClipLabel('mobile-preview') }}</span>

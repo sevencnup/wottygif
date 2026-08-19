@@ -199,6 +199,19 @@ def test_high_quality_preserves_large_image_width(tmp_path) -> None:
         assert image.width == 1600
 
 
+def test_generate_image_gif_uses_requested_fps(tmp_path) -> None:
+    source = tmp_path / "fps-source.png"
+    second_source = tmp_path / "fps-source-2.png"
+    result = tmp_path / "fps-result.gif"
+    gradient_image(source, 20, 20)
+    Image.new("RGB", (20, 20), "red").save(second_source)
+
+    main.generate_image_gif([source, second_source], result, quality=3, fps=5)
+
+    with Image.open(result) as image:
+        assert image.info["duration"] == 200
+
+
 def test_generate_image_gif_applies_per_image_crop(tmp_path) -> None:
     source = tmp_path / "crop-source.png"
     result = tmp_path / "crop-result.gif"
@@ -226,8 +239,9 @@ def test_image_job_accepts_ordered_crop_options(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(main, "RESULTS_DIR", tmp_path)
     captured: dict[str, object] = {}
 
-    def fake_generate_image_gif(input_paths, output_path, quality, crop_options=None):
+    def fake_generate_image_gif(input_paths, output_path, quality, crop_options=None, fps=None):
         captured["crop_options"] = crop_options
+        captured["fps"] = fps
         output_path.write_bytes(b"GIF89a")
 
     monkeypatch.setattr(main, "generate_image_gif", fake_generate_image_gif, raising=False)
@@ -237,6 +251,7 @@ def test_image_job_accepts_ordered_crop_options(tmp_path, monkeypatch) -> None:
         data={
             "mode": "multi_image",
             "quality": "3",
+            "fps": "5",
             "origins": ["upload", "upload"],
             "image_crop_options": (
                 '[{"crop_left_percent":10,"crop_top_percent":5,'
@@ -256,6 +271,7 @@ def test_image_job_accepts_ordered_crop_options(tmp_path, monkeypatch) -> None:
     assert options[0].crop_left_percent == 10
     assert options[0].crop_width_percent == 60
     assert options[1].has_crop is False
+    assert captured["fps"] == 5
 
 
 def test_generate_multi_image_gif(tmp_path, monkeypatch) -> None:

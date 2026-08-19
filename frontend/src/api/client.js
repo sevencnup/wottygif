@@ -71,10 +71,13 @@ const request = async (path, options = {}) => {
 
 export const getHealth = () => request('/api/health')
 
-export const createMediaJob = ({ mode, quality, assets, videoOptions = null, imageCropOptions = null }) => {
+export const createMediaJob = ({ mode, quality, fps = null, assets, videoOptions = null, imageCropOptions = null }) => {
   const formData = new FormData()
   formData.append('mode', mode)
   formData.append('quality', String(quality))
+  if (mode !== 'video' && fps !== null && fps !== '' && fps !== undefined) {
+    formData.append('fps', String(fps))
+  }
   if (mode === 'video' && videoOptions) {
     Object.entries(videoOptions).forEach(([key, value]) => {
       if (value !== null && value !== '' && value !== undefined) {

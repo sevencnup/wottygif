@@ -91,10 +91,10 @@ app = FastAPI(title="WottyGIF API", version="0.3.27", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:2622",
-        "http://127.0.0.1:2622",
+        "http://localhost:23689",
+        "http://127.0.0.1:23689",
     ],
-    allow_origin_regex=r"http://(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}):2622",
+    allow_origin_regex=r"http://(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}):23689",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -453,11 +453,14 @@ def generate_image_gif(
     output_path: Path,
     quality: int,
     crop_options: list[ImageCropOptions] | None = None,
+    fps: int | None = None,
 ) -> None:
     settings = QUALITY_SETTINGS[quality]
     options = crop_options or [ImageCropOptions() for _ in input_paths]
     if len(options) != len(input_paths):
         raise ValueError("图片裁剪参数数量与输入图片数量不一致。")
+    frame_rate = fps or settings["fps"]
+    frame_duration = max(1, round(1000 / frame_rate))
     source_frames = [
         prepare_image(path, settings["max_side"], crop)
         for path, crop in zip(input_paths, options)
@@ -484,7 +487,7 @@ def generate_image_gif(
         format="GIF",
         save_all=True,
         append_images=frames[1:],
-        duration=700,
+        duration=frame_duration,
         loop=0,
         optimize=False,
         disposal=2,
@@ -642,6 +645,7 @@ def health_check() -> dict[str, str]:
 async def create_media_job(
     mode: ProcessingMode = Form(...),
     quality: int = Form(..., ge=1, le=5),
+    fps: int | None = Form(None, ge=1, le=30),
     origins: list[AssetOrigin] = Form(...),
     clip_start_seconds: float | None = Form(None, ge=0),
     clip_end_seconds: float | None = Form(None, gt=0),
@@ -711,7 +715,7 @@ async def create_media_job(
             if mode == ProcessingMode.video:
                 generate_video_gif(input_paths[0], output_path, quality, video_edit_options)
             else:
-                generate_image_gif(input_paths, output_path, quality, image_edit_options)
+                generate_image_gif(input_paths, output_path, quality, image_edit_options, fps=fps)
 
         result_paths[job_id] = output_path
         job.status = JobStatus.completed
