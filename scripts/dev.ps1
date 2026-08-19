@@ -82,10 +82,10 @@ try {
   }
 
   Write-Host "Backend is ready."
-  Write-Host "Frontend starting on http://0.0.0.0:5173"
-  Write-Host "Local URL: http://127.0.0.1:5173"
+  Write-Host "Frontend starting on http://0.0.0.0:2622"
+  Write-Host "Local URL: http://127.0.0.1:2622"
   if ($lanAddress) {
-    Write-Host "LAN URL: http://$($lanAddress.IPAddressToString):5173"
+    Write-Host "LAN URL: http://$($lanAddress.IPAddressToString):2622"
   }
   & pnpm --dir $frontendRoot dev
 }

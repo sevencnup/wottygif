@@ -2212,6 +2212,11 @@ onBeforeUnmount(() => {
                 </label>
               </div>
 
+              <label v-if="videoCropEditorOpen" class="number-field">
+                <span>开始时间</span>
+                <input v-model="clipStartSeconds" type="number" min="0" step="0.1" inputmode="decimal" />
+                <small>秒</small>
+              </label>
             </div>
           </section>
 
@@ -2235,11 +2240,6 @@ onBeforeUnmount(() => {
           <section v-if="mode === 'video'" class="mobile-section">
             <h3>片段时间</h3>
             <div class="mobile-time-grid">
-              <label class="number-field">
-                <span>开始时间</span>
-                <input v-model="clipStartSeconds" type="number" min="0" step="0.1" inputmode="decimal" />
-                <small>秒</small>
-              </label>
               <label class="number-field">
                 <span>结束时间</span>
                 <input
