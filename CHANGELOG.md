@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.30 - 2026-08-19
+
+- Removed the middle "取消修改/确认裁剪" button pair from the mobile video crop editor; confirming the crop is now handled solely by the bottom "确认裁剪" action.
+- Moved "取消修改" into the bottom action bar, immediately left of "确认裁剪", shown only while the video crop editor is open.
+
 ## 0.3.29 - 2026-08-07
 
 - Replaced the redundant mobile configure-page bottom CTA `进入预览` with `确认裁剪`; the clear button is unchanged.

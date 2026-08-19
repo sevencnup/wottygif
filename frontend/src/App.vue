@@ -2206,17 +2206,7 @@ onBeforeUnmount(() => {
                   {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
                 </button>
               </div>
-              <div v-if="videoCropEditorOpen" class="crop-editor-actions">
-                <button type="button" @click="cancelCropChanges">取消修改</button>
-                <button
-                  class="crop-confirm-button"
-                  :class="{ confirmed: !cropIsDirty }"
-                  type="button"
-                  @click="confirmCrop"
-                >
-                  {{ cropIsDirty ? '确认裁剪' : '完成裁剪' }}
-                </button>
-              </div>
+
               <div v-if="videoCropEditorOpen" class="crop-range-list">
                 <label>
                   <span>裁剪宽度</span>
@@ -2337,6 +2327,14 @@ onBeforeUnmount(() => {
 
         <div class="mobile-bottom-cta">
           <button class="ghost-button" type="button" :disabled="!assets.length" @click="resetAssets">清空</button>
+          <button
+            v-if="mode === 'video' && videoCropEditorOpen"
+            class="ghost-button"
+            type="button"
+            @click="cancelCropChanges"
+          >
+            取消修改
+          </button>
           <button class="primary-button" type="button" :disabled="!assets.length" @click="confirmMobileCrop">确认裁剪</button>
         </div>
       </section>
