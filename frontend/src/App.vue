@@ -1511,7 +1511,6 @@ const submitJob = async () => {
     }
 
     queueMessage.value = `已生成 ${createdJobs.length} 个 GIF 成品。`
-    resetAssets({ clearMessage: false })
     scrollMobileMessageIntoView()
     await checkHealth()
     if (createdJobs.length === 1) {
