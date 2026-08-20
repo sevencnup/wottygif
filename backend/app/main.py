@@ -317,11 +317,11 @@ def validate_uploads(mode: ProcessingMode, uploads: list[UploadFile]) -> list[As
 
     kinds = [asset_kind(upload) for upload in uploads]
     if mode == ProcessingMode.single_image and (len(uploads) != 1 or kinds[0] != AssetKind.image):
-        raise HTTPException(status_code=422, detail="单图模式每个任务只能上传一张图片。")
+        raise HTTPException(status_code=422, detail="单张图转GIF每个任务只能上传一张图片。")
     if mode == ProcessingMode.multi_image and (len(uploads) < 2 or any(kind != AssetKind.image for kind in kinds)):
-        raise HTTPException(status_code=422, detail="多图模式至少需要两张图片。")
+        raise HTTPException(status_code=422, detail="多图合成GIF至少需要两张图片。")
     if mode == ProcessingMode.video and (len(uploads) != 1 or kinds[0] != AssetKind.video):
-        raise HTTPException(status_code=422, detail="视频模式每个任务只能上传一个视频。")
+        raise HTTPException(status_code=422, detail="视频转GIF每个任务只能上传一个视频。")
     return kinds
 
 

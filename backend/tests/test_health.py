@@ -274,6 +274,22 @@ def test_image_job_accepts_ordered_crop_options(tmp_path, monkeypatch) -> None:
     assert captured["fps"] == 5
 
 
+def test_reject_fps_outside_supported_range() -> None:
+    for fps in ("0", "31"):
+        response = client.post(
+            "/api/media/jobs",
+            data={
+                "mode": "single_image",
+                "quality": "3",
+                "fps": fps,
+                "origins": "upload",
+            },
+            files={"files": ("frame.png", PNG_BYTES, "image/png")},
+        )
+
+        assert response.status_code == 422
+
+
 def test_generate_multi_image_gif(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(main, "RESULTS_DIR", tmp_path)
 
