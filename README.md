@@ -83,7 +83,7 @@ pnpm dev
 
 This launches:
 
-- FastAPI at `http://127.0.0.1:8000`
+- FastAPI at `http://127.0.0.1:8699`
 - Vite frontend at `http://127.0.0.1:23689` and `http://<LAN-IP>:23689`
 
 The launcher prefers `backend\.venv\Scripts\python.exe`. If that virtual environment is missing, it falls back to the system `python` command and then `py`. Python 3.10 or newer is supported.

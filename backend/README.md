@@ -33,13 +33,13 @@ The unified launcher waits for `GET /api/health` before starting Vite and prints
 Health check:
 
 ```text
-GET http://127.0.0.1:8000/api/health
+GET http://127.0.0.1:8699/api/health
 ```
 
 Create job:
 
 ```text
-POST http://127.0.0.1:8000/api/media/jobs
+POST http://127.0.0.1:8699/api/media/jobs
 ```
 
 Multipart fields:
@@ -59,11 +59,11 @@ Only confirmed client crop values are submitted. The frontend mirrors those conf
 Download a completed result:
 
 ```text
-GET http://127.0.0.1:8000/api/media/jobs/{job_id}/result
+GET http://127.0.0.1:8699/api/media/jobs/{job_id}/result
 ```
 
 Download all currently completed results as a ZIP archive:
 
 ```text
-GET http://127.0.0.1:8000/api/media/jobs/batch-download
+GET http://127.0.0.1:8699/api/media/jobs/batch-download
 ```

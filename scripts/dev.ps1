@@ -7,7 +7,7 @@ $backendPython = Join-Path $backendRoot '.venv\Scripts\python.exe'
 $backendLog = Join-Path $repoRoot 'backend-dev.log'
 $backendErrLog = Join-Path $repoRoot 'backend-dev.err.log'
 $backendCommand = $null
-$backendArguments = @('-m', 'uvicorn', 'app.main:app', '--reload', '--host', '127.0.0.1', '--port', '8000')
+$backendArguments = @('-m', 'uvicorn', 'app.main:app', '--reload', '--host', '127.0.0.1', '--port', '8699')
 $lanAddress = [System.Net.Dns]::GetHostAddresses([System.Net.Dns]::GetHostName()) |
   Where-Object {
     $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork -and
@@ -45,7 +45,7 @@ $backendProcess = Start-Process `
   -PassThru `
   -WindowStyle Hidden
 
-Write-Host "Backend started on http://127.0.0.1:8000 (PID: $($backendProcess.Id))"
+Write-Host "Backend started on http://127.0.0.1:8699 (PID: $($backendProcess.Id))"
 
 try {
   $backendReady = $false
@@ -57,7 +57,7 @@ try {
 
     try {
       $health = Invoke-RestMethod `
-        -Uri 'http://127.0.0.1:8000/api/health' `
+        -Uri 'http://127.0.0.1:8699/api/health' `
         -TimeoutSec 1
 
       if ($health.status -eq 'ok') {
