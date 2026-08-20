@@ -1689,7 +1689,7 @@ onBeforeUnmount(() => {
                   <span>{{ cropSummary }}</span>
                 </div>
                 <button type="button" @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()">
-                  {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
+                  {{ videoCropEditorOpen ? '重置' : '裁剪画面' }}
                 </button>
               </div>
               <div v-if="videoCropEditorOpen" class="crop-range-list">
@@ -2320,7 +2320,7 @@ onBeforeUnmount(() => {
                 type="button"
                 @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()"
               >
-                {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
+                {{ videoCropEditorOpen ? '重置' : '裁剪画面' }}
               </button>
               <button v-if="mode === 'video'" class="edit-command" type="button" @click="openMobileVideoEditor">
                 编辑画面
