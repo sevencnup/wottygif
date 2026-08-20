@@ -266,7 +266,8 @@ const clipBounds = (mediaDuration = 0) => {
 }
 
 const mobileVideoNativeDuration = computed(() =>
-  Number(videoProgressStates.value['mobile-source']?.duration)
+  Number(videoProgressStates.value['desktop-preview']?.duration)
+    || Number(videoProgressStates.value['mobile-source']?.duration)
     || Number(videoProgressStates.value['mobile-preview']?.duration)
     || 0
 )
@@ -516,17 +517,34 @@ const resetCrop = () => {
   setCropBox({ left: 0, top: 0, width: 100, height: 100 })
 }
 
+const resetVideoPlayback = (video, surface) => {
+  const media = resolveVideoElement(video)
+  if (!media) {
+    setVideoPlaybackState(surface, false)
+    return
+  }
+  const bounds = clipBounds(media.duration)
+  media.pause()
+  if (Number.isFinite(media.duration) && media.duration > 0) {
+    media.currentTime = Math.min(bounds.start, Math.max(0, media.duration - 0.01))
+  }
+  updateVideoProgress(media, surface)
+  setVideoPlaybackState(surface, false)
+}
+
 const confirmCrop = () => {
   constrainCropFields()
   confirmedCropBox.value = { ...cropBox.value }
   cropIsDirty.value = false
   videoCropEditorOpen.value = false
+  resetVideoPlayback(mobileSourceVideo, 'mobile-source')
 }
 
 const cancelCropChanges = () => {
   setCropBox(confirmedCropBox.value, { markDirty: false })
   cropIsDirty.value = false
   videoCropEditorOpen.value = false
+  resetVideoPlayback(mobileSourceVideo, 'mobile-source')
 }
 
 const openVideoCropEditor = () => {
@@ -540,7 +558,7 @@ const resetCropForNewVideo = () => {
   setCropBox(fullFrame, { markDirty: false })
   confirmedCropBox.value = fullFrame
   cropIsDirty.value = false
-  videoCropEditorOpen.value = true
+  videoCropEditorOpen.value = isMobileViewport()
   clipStartSeconds.value = '0'
   clipEndSeconds.value = ''
   videoProgressStates.value = {}
@@ -570,7 +588,7 @@ const handleVideoMetadata = (event, assetId = previewAsset.value?.id, surface = 
     }
   }
   const bounds = clipBounds(video.duration)
-  if (surface === 'mobile-source' || surface === 'mobile-preview') {
+  if (surface === 'desktop-preview' || surface === 'mobile-source' || surface === 'mobile-preview') {
     syncMobileVideoDuration(video.duration)
   }
   if (bounds.start < video.duration && (video.currentTime < bounds.start || video.currentTime >= bounds.end)) {
@@ -1639,74 +1657,41 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <section class="control-section settings-section">
-          <h2 class="section-title">设置选项</h2>
-          <div v-if="mode === 'video'" class="video-edit-panel">
-            <div v-if="previewAsset?.kind === 'video'" class="crop-editor">
-              <div class="crop-editor-head">
-                <div>
-                  <strong>画面裁剪</strong>
-                  <span>{{ cropSummary }}</span>
-                </div>
-                <button type="button" @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()">
-                  {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
-                </button>
-              </div>
-              <div v-if="videoCropEditorOpen" class="crop-range-list">
-                <label>
-                  <span>裁剪宽度</span>
-                  <input
-                    v-model="cropWidthPercent"
-                    type="range"
-                    min="1"
-                    :max="cropWidthMax"
-                    step="1"
-                    @input="constrainCropFields"
-                  />
-                  <output>{{ cropBox.width }}%</output>
-                </label>
-                <label>
-                  <span>裁剪高度</span>
-                  <input
-                    v-model="cropHeightPercent"
-                    type="range"
-                    min="1"
-                    :max="cropHeightMax"
-                    step="1"
-                    @input="constrainCropFields"
-                  />
-                  <output>{{ cropBox.height }}%</output>
-                </label>
-              </div>
-              <div v-if="videoCropEditorOpen" class="crop-editor-actions">
-                <button type="button" @click="cancelCropChanges">取消修改</button>
-                <button
-                  class="crop-confirm-button"
-                  :class="{ confirmed: !cropIsDirty }"
-                  type="button"
-                  @click="confirmCrop"
-                >
-                  {{ cropIsDirty ? '确认裁剪' : '完成裁剪' }}
-                </button>
-              </div>
+        <section v-if="mode === 'video'" class="control-section video-duration-section">
+          <div v-if="previewAsset?.kind === 'video'" class="video-duration-control desktop-video-duration-control">
+            <div class="video-duration-head">
+              <span>视频时长（从 0 秒开始）</span>
+              <output>{{ mobileVideoDurationLabel }}</output>
             </div>
-
-            <div class="video-edit-row">
-              <label class="number-field">
-                <span>开始时间</span>
-                <input v-model="clipStartSeconds" type="number" min="0" step="0.1" inputmode="decimal" />
-                <small>秒</small>
-              </label>
-              <label class="number-field">
-                <span>结束时间</span>
-                <input v-model="clipEndSeconds" type="number" min="0" step="0.1" inputmode="decimal" placeholder="到结尾" />
-                <small>秒</small>
-              </label>
+            <input
+              class="video-duration-range"
+              :value="mobileVideoDurationValue"
+              type="range"
+              min="0.1"
+              :max="mobileVideoDuration"
+              step="0.1"
+              aria-label="视频时长"
+              @input="updateMobileVideoDuration($event.target.value)"
+            />
+            <div class="range-scale" aria-hidden="true">
+              <span>0.1 秒</span>
+              <span>{{ mobileVideoDuration.toFixed(1) }} 秒</span>
             </div>
-
           </div>
+        </section>
 
-          <div v-else class="image-edit-panel">
+        <section v-if="mode === 'video'" class="control-section settings-section video-settings-section">
+          <div class="video-edit-panel">
+            <div class="crop-editor-actions">
+              <button type="button" @click="cancelCropChanges">取消修改</button>
+              <button class="crop-confirm-button" type="button" @click="confirmCrop">确认裁剪</button>
+            </div>
+          </div>
+        </section>
+
+        <section v-else class="control-section settings-section">
+          <h2 class="section-title">设置选项</h2>
+          <div class="image-edit-panel">
             <button
               v-if="!showImageCropEditor"
               class="image-crop-launch"
@@ -1884,10 +1869,7 @@ onBeforeUnmount(() => {
             <div
               v-else-if="previewAsset"
               class="media-crop-viewport desktop-media-crop-viewport video-preview-surface"
-              :class="{
-                cropped: hasAppliedPreviewCrop,
-                'video-crop-stage': previewAsset.kind === 'video' && videoCropEditorOpen
-              }"
+              :class="{ cropped: hasAppliedPreviewCrop }"
               :style="desktopMediaPreviewViewportStyle"
             >
               <img
@@ -1917,24 +1899,6 @@ onBeforeUnmount(() => {
                 @pause="stopVideoPlaybackState('desktop-preview')"
                 @ended="stopVideoPlaybackState('desktop-preview')"
               ></video>
-              <div
-                v-if="previewAsset.kind === 'video' && videoCropEditorOpen"
-                class="crop-box"
-                :style="cropBoxStyle"
-                role="application"
-                aria-label="视频画面裁剪区域"
-                @pointerdown.prevent="startCropInteraction($event, 'move')"
-              >
-                <span class="crop-thirds" aria-hidden="true"></span>
-                <span
-                  v-for="handle in CROP_HANDLES"
-                  :key="handle"
-                  class="crop-handle"
-                  :class="`handle-${handle}`"
-                  aria-hidden="true"
-                  @pointerdown.stop.prevent="startCropInteraction($event, handle)"
-                ></span>
-              </div>
             </div>
             <div v-else class="empty-preview">
               <p>上传后预览会显示在这里</p>
@@ -1958,29 +1922,6 @@ onBeforeUnmount(() => {
             <button class="icon-button" type="button" aria-label="全屏预览">
               <Maximize2 :size="17" :stroke-width="2.3" aria-hidden="true" />
             </button>
-          </div>
-
-          <div
-            v-if="mode === 'video' && previewAsset?.kind === 'video'"
-            class="video-clip-controls preview-video-clip-controls"
-          >
-            <label class="number-field">
-              <span>片段开始</span>
-              <input v-model="clipStartSeconds" type="number" min="0" step="0.1" inputmode="decimal" />
-              <small>秒</small>
-            </label>
-            <label class="number-field">
-              <span>片段结束</span>
-              <input
-                v-model="clipEndSeconds"
-                type="number"
-                min="0"
-                step="0.1"
-                inputmode="decimal"
-                placeholder="到结尾"
-              />
-              <small>秒</small>
-            </label>
           </div>
 
           <div class="frame-strip">
@@ -2250,17 +2191,17 @@ onBeforeUnmount(() => {
               </template>
             </div>
 
-            <div v-if="previewAsset.kind === 'video' && videoCropEditorOpen" class="crop-video-controls">
+            <div v-if="previewAsset.kind === 'video'" class="crop-video-controls">
               <button
                 class="icon-button"
                 type="button"
-                :aria-label="isVideoPlaying('mobile-source') ? '暂停裁剪预览' : '播放裁剪预览'"
+                :aria-label="isVideoPlaying('mobile-source') ? '暂停视频预览' : '播放视频预览'"
                 @click="toggleVideoPlayback(mobileSourceVideo, 'mobile-source')"
               >
                 <Pause v-if="isVideoPlaying('mobile-source')" :size="18" :stroke-width="2.4" aria-hidden="true" />
                 <Play v-else :size="18" :stroke-width="2.4" aria-hidden="true" />
               </button>
-              <span>在当前预览中检查裁剪画面</span>
+              <span>{{ videoCropEditorOpen ? '在当前预览中检查裁剪画面' : '播放当前视频预览' }}</span>
             </div>
 
             <div class="mobile-asset-strip" role="tablist" aria-label="已上传素材">
@@ -2289,7 +2230,6 @@ onBeforeUnmount(() => {
                 +
               </button>
             </div>
-
             <div class="mobile-asset-actions">
               <button
                 type="button"
@@ -2743,4 +2683,3 @@ onBeforeUnmount(() => {
     />
   </main>
 </template>
-
