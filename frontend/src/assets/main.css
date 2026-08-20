@@ -1638,10 +1638,10 @@ h1 {
   display: grid;
   width: 100%;
   min-height: 0;
-  max-height: 300px;
+  max-height: 420px;
   margin: 0 auto;
   overflow: hidden;
-  aspect-ratio: 16 / 8;
+  aspect-ratio: 16 / 10;
   place-items: center;
   border-radius: 6px;
   background: #11131a;
@@ -1999,7 +1999,7 @@ h1 {
   display: grid;
   min-height: 0;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 16 / 12;
   place-items: center;
   padding: 12px;
 }
