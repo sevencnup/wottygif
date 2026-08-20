@@ -1736,7 +1736,7 @@ h1 {
 
 .mobile-asset-actions {
   display: grid;
-  grid-template-columns: 38px 38px minmax(0, 1fr);
+  grid-template-columns: 38px 38px minmax(0, 1fr) minmax(0, 1fr);
   gap: 5px;
   margin-bottom: 0;
 }
@@ -2962,3 +2962,4 @@ h1 {
     overflow: hidden;
   }
 }
+
