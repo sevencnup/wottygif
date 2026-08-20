@@ -708,6 +708,24 @@ const resolveVideoElement = (video) => {
   return video
 }
 
+const scrubSurfaceVideoRef = {
+  'desktop-preview': desktopPreviewVideo,
+  'mobile-source': mobileSourceVideo,
+  'mobile-preview': mobilePreviewVideo
+}
+
+// 拖动双端截取头时，将对应 surface 的预览视频 seek 到该时间点并暂停，显示对应画面帧
+const scrubVideoTo = (surface, seconds) => {
+  const media = resolveVideoElement(scrubSurfaceVideoRef[surface])
+  if (!media || !Number.isFinite(media.duration) || media.duration <= 0) {
+    return
+  }
+  const target = clamp(Number(seconds) || 0, 0, media.duration - 0.01)
+  media.pause()
+  media.currentTime = target
+  updateVideoProgress(media, surface)
+}
+
 const toggleVideoPlayback = (video, surface) => {
   const media = resolveVideoElement(video)
   if (!media) {
@@ -1683,6 +1701,7 @@ onBeforeUnmount(() => {
               :end="videoSourceEndValue"
               @update:start="updateMobileVideoStart"
               @update:end="updateVideoClipEnd"
+              @scrub="(v) => scrubVideoTo('desktop-preview', v)"
             />
             <div class="range-scale" aria-hidden="true">
               <span>{{ formatPlaybackTime(videoStartValue) }}</span>
@@ -2414,6 +2433,7 @@ onBeforeUnmount(() => {
                   :end="videoSourceEndValue"
                   @update:start="updateMobileVideoStart"
                   @update:end="updateVideoClipEnd"
+                  @scrub="(v) => scrubVideoTo('mobile-source', v)"
                 />
                 <div class="range-scale" aria-hidden="true">
                   <span>{{ formatPlaybackTime(videoStartValue) }}</span>
@@ -2537,6 +2557,7 @@ onBeforeUnmount(() => {
                 :end="videoSourceEndValue"
                 @update:start="updateMobileVideoStart"
                 @update:end="updateVideoClipEnd"
+                @scrub="(v) => scrubVideoTo('mobile-preview', v)"
               />
               <div class="range-scale" aria-hidden="true">
                 <span>{{ formatPlaybackTime(videoStartValue) }}</span>

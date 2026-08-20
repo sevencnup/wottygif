@@ -9,7 +9,7 @@ const props = defineProps({
   step: { type: Number, default: 0.1 }
 })
 
-const emit = defineEmits(['update:start', 'update:end'])
+const emit = defineEmits(['update:start', 'update:end', 'scrub'])
 
 const clamp = (value, low, high) => Math.min(Math.max(value, low), high)
 
@@ -64,16 +64,23 @@ const onPointerMove = (event) => {
   }
   const value = valueFromClientX(event.clientX)
   if (drag.type === 'start') {
-    emit('update:start', clamp(value, props.min, props.end - props.step))
+    const v = clamp(value, props.min, props.end - props.step)
+    emit('update:start', v)
+    emit('scrub', v)
   } else if (drag.type === 'end') {
-    emit('update:end', clamp(value, props.start + props.step, props.max))
+    const v = clamp(value, props.start + props.step, props.max)
+    emit('update:end', v)
+    emit('scrub', v)
   } else {
     const rect = trackEl.value.getBoundingClientRect()
     const delta = ((event.clientX - drag.originX) / rect.width) * span.value
     const windowSize = drag.originEnd - drag.originStart
     const shift = clamp(delta, -drag.originStart, props.max - drag.originStart - windowSize)
-    emit('update:start', Math.round((drag.originStart + shift) * 10) / 10)
-    emit('update:end', Math.round((drag.originEnd + shift) * 10) / 10)
+    const newStart = Math.round((drag.originStart + shift) * 10) / 10
+    const newEnd = Math.round((drag.originEnd + shift) * 10) / 10
+    emit('update:start', newStart)
+    emit('update:end', newEnd)
+    emit('scrub', newStart)
   }
 }
 
@@ -89,9 +96,13 @@ const onPointerUp = (event) => {
 
 const nudge = (type, delta) => {
   if (type === 'start') {
-    emit('update:start', clamp(props.start + delta, props.min, props.end - props.step))
+    const v = clamp(props.start + delta, props.min, props.end - props.step)
+    emit('update:start', v)
+    emit('scrub', v)
   } else {
-    emit('update:end', clamp(props.end + delta, props.start + props.step, props.max))
+    const v = clamp(props.end + delta, props.start + props.step, props.max)
+    emit('update:end', v)
+    emit('scrub', v)
   }
 }
 
