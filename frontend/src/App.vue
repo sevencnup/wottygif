@@ -6,21 +6,24 @@ import { createMediaJob, getHealth, listMediaJobs, resolveApiUrl } from './api/c
 const MODE_OPTIONS = [
   {
     value: 'single_image',
-    label: '单图模式',
-    hint: '每张图片单独创建任务。',
-    accept: 'image/*'
+    label: '单张图转GIF',
+    hint: '每张图片单独创建任务，支持批量制作。',
+    accept: 'image/*',
+    icon: '/dantu.png'
   },
   {
     value: 'multi_image',
-    label: '多图模式',
+    label: '多图合成GIF',
     hint: '多张图片合成一个结果。',
-    accept: 'image/*'
+    accept: 'image/*',
+    icon: '/duotu.png'
   },
   {
     value: 'video',
-    label: '视频制作',
+    label: '视频转GIF',
     hint: '单个视频最长支持 30 秒。',
-    accept: 'video/*'
+    accept: 'video/*',
+    icon: '/ship.png'
   }
 ]
 
@@ -31,14 +34,13 @@ const QUALITY_OPTIONS = [
   { value: 4, label: '高质量', hint: '高清画质', detail: '1080p' }
 ]
 
-const FPS_OPTIONS = [
-  { value: 'auto', label: '跟随质量' },
-  { value: '6', label: '6 FPS' },
-  { value: '8', label: '8 FPS' },
-  { value: '10', label: '10 FPS' },
-  { value: '12', label: '12 FPS' },
-  { value: '15', label: '15 FPS' }
-]
+const FPS_MIN = 1
+const FPS_MAX = 30
+const MAX_VIDEO_SECONDS = 30
+const COPYRIGHT_LABEL = '© 2026 WottyGIF 版权所有'
+const RESULT_RETENTION_LABEL = '生成文件将在完成后 1 小时自动删除'
+const OPEN_SOURCE_LABEL = '开源项目地址待补充'
+const defaultFpsForQuality = (qualityValue) => ({ 1: 6, 2: 8, 3: 10, 4: 12, 5: 15 })[qualityValue] ?? 10
 
 const LOOP_OPTIONS = [
   { value: 'forever', label: '无限' },
@@ -49,15 +51,14 @@ const LOOP_OPTIONS = [
 const health = ref('checking')
 const mode = ref('single_image')
 const quality = ref(3)
-const fpsSetting = ref('auto')
+const fpsSetting = ref(defaultFpsForQuality(quality.value))
 const loopSetting = ref('forever')
 const clipStartSeconds = ref('0')
 const clipEndSeconds = ref('')
-const defaultFpsForQuality = (qualityValue) => ({ 1: 6, 2: 8, 3: 10, 4: 12, 5: 15 })[qualityValue] ?? 10
 const resolvedFps = computed(() => {
   const selected = Number(fpsSetting.value)
-  return fpsSetting.value !== 'auto' && Number.isFinite(selected) && selected > 0
-    ? selected
+  return Number.isFinite(selected)
+    ? Math.min(FPS_MAX, Math.max(FPS_MIN, Math.round(selected)))
     : defaultFpsForQuality(quality.value)
 })
 const imagePlaybackDelay = computed(() => Math.max(50, Math.round(1000 / resolvedFps.value)))
@@ -238,7 +239,7 @@ const submitHint = computed(() => {
     return '后端未连接，提交会失败。'
   }
   if (mode.value === 'multi_image' && assets.value.length < 2) {
-    return '多图模式至少需要 2 张图片。'
+    return '多图合成GIF至少需要 2 张图片。'
   }
   if (!assets.value.length) {
     return '先加入素材。'
@@ -246,7 +247,10 @@ const submitHint = computed(() => {
   return '可以直接生成 GIF。'
 })
 
-const currentFpsLabel = computed(() => `${resolvedFps.value} FPS`)
+const currentFpsLabel = computed(() => {
+  const fps = mode.value === 'video' ? defaultFpsForQuality(quality.value) : resolvedFps.value
+  return `${fps} FPS`
+})
 
 const clipBounds = (mediaDuration = 0) => {
   const rawStart = Number(clipStartSeconds.value || 0)
@@ -259,6 +263,61 @@ const clipBounds = (mediaDuration = 0) => {
     ? Math.min(Math.max(requestedEnd, start), sourceEnd)
     : sourceEnd
   return { start, end, duration: Math.max(end - start, 0) }
+}
+
+const mobileVideoNativeDuration = computed(() =>
+  Number(videoProgressStates.value['mobile-source']?.duration)
+    || Number(videoProgressStates.value['mobile-preview']?.duration)
+    || 0
+)
+
+const mobileVideoDuration = computed(() => {
+  const duration = mobileVideoNativeDuration.value
+  return duration > 0 ? Math.min(duration, MAX_VIDEO_SECONDS) : MAX_VIDEO_SECONDS
+})
+
+const mobileVideoCanReachEnd = computed(() =>
+  mobileVideoNativeDuration.value <= 0 || mobileVideoNativeDuration.value <= MAX_VIDEO_SECONDS
+)
+
+const mobileVideoDurationValue = computed(() => {
+  const current = Number(clipEndSeconds.value)
+  if (!Number.isFinite(current) || current <= 0) {
+    return mobileVideoDuration.value
+  }
+  return clamp(current, 0.1, mobileVideoDuration.value)
+})
+
+const mobileVideoDurationLabel = computed(() => {
+  const current = mobileVideoDurationValue.value
+  const maximum = mobileVideoDuration.value
+  return mobileVideoCanReachEnd.value && current >= maximum - 0.05 ? '到结尾' : `${current.toFixed(1)} 秒`
+})
+
+const updateMobileVideoDuration = (value) => {
+  const duration = clamp(Number(value) || 0.1, 0.1, mobileVideoDuration.value)
+  clipStartSeconds.value = '0'
+  clipEndSeconds.value = mobileVideoCanReachEnd.value && duration >= mobileVideoDuration.value - 0.05
+    ? ''
+    : duration.toFixed(1)
+}
+
+const syncMobileVideoDuration = (mediaDuration) => {
+  const duration = Number(mediaDuration)
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return
+  }
+  const maximum = Math.min(duration, MAX_VIDEO_SECONDS)
+  const current = Number(clipEndSeconds.value)
+  if (clipEndSeconds.value === '') {
+    if (duration > MAX_VIDEO_SECONDS) {
+      clipEndSeconds.value = maximum.toFixed(1)
+    }
+    return
+  }
+  if (Number.isFinite(current)) {
+    clipEndSeconds.value = String(Math.min(Math.max(current, 0.1), maximum))
+  }
 }
 
 const formatPlaybackTime = (seconds) => {
@@ -484,6 +543,7 @@ const resetCropForNewVideo = () => {
   videoCropEditorOpen.value = true
   clipStartSeconds.value = '0'
   clipEndSeconds.value = ''
+  videoProgressStates.value = {}
 }
 
 const updateVideoProgress = (video, surface) => {
@@ -510,6 +570,9 @@ const handleVideoMetadata = (event, assetId = previewAsset.value?.id, surface = 
     }
   }
   const bounds = clipBounds(video.duration)
+  if (surface === 'mobile-source' || surface === 'mobile-preview') {
+    syncMobileVideoDuration(video.duration)
+  }
   if (bounds.start < video.duration && (video.currentTime < bounds.start || video.currentTime >= bounds.end)) {
     video.currentTime = bounds.start
   }
@@ -1203,6 +1266,9 @@ const openPreviewPage = () => {
     openPicker()
     return
   }
+  if (mode.value === 'video' && isMobileViewport()) {
+    clipStartSeconds.value = '0'
+  }
   if (mode.value === 'video' && cropIsDirty.value) {
     errorMessage.value = '请先确认画面裁剪，再进入预览。'
     openMobileVideoEditor()
@@ -1289,7 +1355,7 @@ const buildImageCropOptions = (selectedAssets) => {
 const createPayloadForAssets = (selectedAssets) => ({
   mode: mode.value,
   quality: quality.value,
-  fps: mode.value !== 'video' && fpsSetting.value !== 'auto' ? resolvedFps.value : null,
+  fps: mode.value !== 'video' ? resolvedFps.value : null,
   assets: selectedAssets,
   videoOptions: mode.value === 'video' ? buildVideoOptions() : null,
   imageCropOptions: mode.value !== 'video' ? buildImageCropOptions(selectedAssets) : null
@@ -1346,7 +1412,7 @@ const submitJob = async () => {
 
   if (!canSubmit.value) {
     errorMessage.value =
-      mode.value === 'multi_image' ? '多图模式至少需要 2 张图片。' : '请先添加素材。'
+      mode.value === 'multi_image' ? '多图合成GIF至少需要 2 张图片。' : '请先添加素材。'
     return
   }
 
@@ -1490,9 +1556,11 @@ onBeforeUnmount(() => {
     <section class="workspace studio-grid">
       <form class="control-panel" @submit.prevent="submitJob">
         <header class="brand-header">
-          <div class="brand-mark">GIF</div>
+          <div class="brand-mark">
+            <img src="/logo.png" alt="WottyGIF 主 Logo" />
+          </div>
           <div class="brand-copy">
-            <h1>GIF 制作器</h1>
+            <h1> wotty GIF 制作</h1>
             <p>轻松制作，快速生成</p>
           </div>
           <span :class="['status', health]" role="status">{{ healthLabel }}</span>
@@ -1510,7 +1578,9 @@ onBeforeUnmount(() => {
               :aria-pressed="option.value === mode"
               @click="applyModeRules(option.value)"
             >
-              <span class="mode-icon" aria-hidden="true"></span>
+              <span class="mode-icon" aria-hidden="true">
+                <img :src="option.icon" :alt="`${option.label}图标`" />
+              </span>
               <strong>{{ option.label }}</strong>
               <small>{{ option.hint }}</small>
             </button>
@@ -1528,7 +1598,7 @@ onBeforeUnmount(() => {
             @keydown.enter.prevent="openPicker"
             @keydown.space.prevent="openPicker"
           >
-            <span class="upload-icon" aria-hidden="true"></span>
+            <img class="upload-icon" src="/Upload.png" alt="" aria-hidden="true" />
             <div class="paste-copy">
               <strong>点击上传图片</strong>
               <p>支持 JPG、PNG、WEBP；视频最长 30 秒</p>
@@ -1696,14 +1766,24 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <div class="settings-grid">
-              <label class="select-field">
-                <span>帧率 (FPS)</span>
-                <select v-model="fpsSetting">
-                  <option v-for="option in FPS_OPTIONS" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
+            <div v-if="mode === 'multi_image'" class="settings-grid">
+              <label class="range-field fps-range-field">
+                <div class="range-field-head">
+                  <span>帧率 (FPS)</span>
+                  <output>{{ currentFpsLabel }}</output>
+                </div>
+                <input
+                  v-model.number="fpsSetting"
+                  type="range"
+                  :min="FPS_MIN"
+                  :max="FPS_MAX"
+                  step="1"
+                  aria-label="帧率"
+                />
+                <div class="range-scale" aria-hidden="true">
+                  <span>慢</span>
+                  <span>快</span>
+                </div>
               </label>
               <label class="select-field">
                 <span>循环次数</span>
@@ -1745,6 +1825,11 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <p class="submit-hint">{{ submitHint }}</p>
+        <footer class="app-footer">
+          <span>{{ COPYRIGHT_LABEL }}</span>
+          <span>{{ RESULT_RETENTION_LABEL }}</span>
+          <span>{{ OPEN_SOURCE_LABEL }}</span>
+        </footer>
       </form>
 
       <section class="preview-panel">
@@ -1839,7 +1924,6 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <div v-else class="empty-preview">
-              <span class="empty-mark" aria-hidden="true"></span>
               <p>上传后预览会显示在这里</p>
             </div>
           </div>
@@ -1958,9 +2042,12 @@ onBeforeUnmount(() => {
 
     <section class="mobile-shell">
       <section v-if="mobilePage === 'home'" class="mobile-page mobile-home">
-        <header class="mobile-topbar">
+        <header class="mobile-topbar mobile-brand-topbar">
           <span class="topbar-spacer"></span>
-          <h2>GIF 制作</h2>
+          <div class="mobile-brand-block">
+            <img class="mobile-brand-logo" src="/logo.png" alt="WottyGIF 主 Logo" />
+            <span class="mobile-brand-title">wotty gif</span>
+          </div>
           <span class="topbar-spacer"></span>
         </header>
 
@@ -1976,7 +2063,9 @@ onBeforeUnmount(() => {
                 type="button"
                 @click="openModeConfigurator(option.value)"
               >
-                <span class="mobile-mode-icon" :class="`mode-${option.value}`" aria-hidden="true"></span>
+                <span class="mobile-mode-icon" aria-hidden="true">
+                  <img :src="option.icon" :alt="`${option.label}图标`" />
+                </span>
                 <span class="mobile-mode-copy">
                   <strong>{{ option.label }}</strong>
                   <small>{{ option.hint }}</small>
@@ -1985,6 +2074,12 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </section>
+
+          <footer class="app-footer">
+            <span>{{ COPYRIGHT_LABEL }}</span>
+            <span>{{ RESULT_RETENTION_LABEL }}</span>
+            <span>{{ OPEN_SOURCE_LABEL }}</span>
+          </footer>
         </div>
 
         <nav class="mobile-tabbar" aria-label="移动端导航">
@@ -2021,7 +2116,7 @@ onBeforeUnmount(() => {
             @keydown.enter.prevent="openPicker"
             @keydown.space.prevent="openPicker"
           >
-            <span class="upload-icon" aria-hidden="true"></span>
+            <img class="upload-icon" src="/Upload.png" alt="" aria-hidden="true" />
             <strong>
               {{ assets.length ? '继续添加素材' : mode === 'video' ? '点击上传视频' : '点击上传图片' }}
             </strong>
@@ -2213,6 +2308,20 @@ onBeforeUnmount(() => {
                 {{ imageCropActive ? '继续裁剪' : '裁剪图片' }}
               </button>
             </div>
+
+            <button
+              v-if="mode === 'multi_image' && assets.length > 1"
+              class="mobile-image-playback-control"
+              type="button"
+              :disabled="!imagePreviewPlayable"
+              :aria-label="imagePlaybackPlaying ? '暂停多图预览' : '播放多图预览'"
+              @click="toggleImagePlayback"
+            >
+              <Pause v-if="imagePlaybackPlaying" :size="17" :stroke-width="2.4" aria-hidden="true" />
+              <Play v-else :size="17" :stroke-width="2.4" aria-hidden="true" />
+              <span>{{ imagePlaybackPlaying ? '暂停预览' : '播放预览' }}</span>
+              <strong>{{ currentFpsLabel }}</strong>
+            </button>
           </section>
 
           <section
@@ -2310,17 +2419,29 @@ onBeforeUnmount(() => {
                   <output>{{ cropBox.height }}%</output>
                 </label>
               </div>
-
-              <label v-if="videoCropEditorOpen" class="number-field">
-                <span>开始时间</span>
-                <input v-model="clipStartSeconds" type="number" min="0" step="0.1" inputmode="decimal" />
-                <small>秒</small>
-              </label>
             </div>
           </section>
 
           <section class="mobile-section">
             <h3>生成质量</h3>
+            <label v-if="mode === 'multi_image'" class="mobile-setting-row mobile-fps-row">
+              <div class="mobile-fps-head">
+                <span>帧率</span>
+                <output>{{ currentFpsLabel }}</output>
+              </div>
+              <input
+                v-model.number="fpsSetting"
+                type="range"
+                :min="FPS_MIN"
+                :max="FPS_MAX"
+                step="1"
+                aria-label="帧率"
+              />
+              <div class="range-scale" aria-hidden="true">
+                <span>慢</span>
+                <span>快</span>
+              </div>
+            </label>
             <div class="mobile-quality-row">
               <button
                 v-for="option in QUALITY_OPTIONS"
@@ -2339,39 +2460,25 @@ onBeforeUnmount(() => {
           <section v-if="mode === 'video'" class="mobile-section">
             <h3>片段时间</h3>
             <div class="mobile-time-grid">
-              <label class="number-field">
-                <span>结束时间</span>
+              <div class="mobile-video-duration-control">
+                <div class="mobile-video-duration-head">
+                  <span>视频时长（从 0 秒开始）</span>
+                  <output>{{ mobileVideoDurationLabel }}</output>
+                </div>
                 <input
-                  v-model="clipEndSeconds"
-                  type="number"
-                  min="0"
+                  class="mobile-video-duration-range"
+                  :value="mobileVideoDurationValue"
+                  type="range"
+                  min="0.1"
+                  :max="mobileVideoDuration"
                   step="0.1"
-                  inputmode="decimal"
-                  placeholder="到结尾"
+                  aria-label="视频时长"
+                  @input="updateMobileVideoDuration($event.target.value)"
                 />
-                <small>秒</small>
-              </label>
-            </div>
-          </section>
-
-          <section v-else class="mobile-section">
-            <h3>设置选项</h3>
-            <div class="mobile-setting-list">
-              <div class="mobile-setting-row">
-                <span>帧率</span>
-                <select v-model="fpsSetting" aria-label="帧率">
-                  <option v-for="option in FPS_OPTIONS" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-              </div>
-              <div class="mobile-setting-row">
-                <span>循环次数</span>
-                <strong>无限循环</strong>
-              </div>
-              <div class="mobile-setting-row">
-                <span>最大边长</span>
-                <strong>{{ currentQualityMeta.detail }}</strong>
+                <div class="range-scale" aria-hidden="true">
+                  <span>0.1 秒</span>
+                  <span>{{ mobileVideoDuration.toFixed(1) }} 秒</span>
+                </div>
               </div>
             </div>
           </section>
@@ -2451,7 +2558,6 @@ onBeforeUnmount(() => {
               </div>
             </template>
             <div v-else class="empty-preview">
-              <span class="empty-mark" aria-hidden="true"></span>
               <p>上传后预览会显示在这里</p>
             </div>
           </div>
@@ -2466,6 +2572,9 @@ onBeforeUnmount(() => {
             >
               <Pause v-if="isPreviewPlaying('mobile-preview')" :size="17" :stroke-width="2.4" aria-hidden="true" />
               <Play v-else :size="17" :stroke-width="2.4" aria-hidden="true" />
+              <span class="mobile-preview-play-label">
+                {{ isPreviewPlaying('mobile-preview') ? '暂停' : '播放' }}
+              </span>
             </button>
             <span>{{ videoClipLabel('mobile-preview') }}</span>
             <div class="timeline" aria-hidden="true"><span :style="videoTimelineStyle('mobile-preview')"></span></div>
@@ -2476,23 +2585,26 @@ onBeforeUnmount(() => {
             v-if="mode === 'video' && previewAsset?.kind === 'video'"
             class="video-clip-controls preview-video-clip-controls"
           >
-            <label class="number-field">
-              <span>片段开始</span>
-              <input v-model="clipStartSeconds" type="number" min="0" step="0.1" inputmode="decimal" />
-              <small>秒</small>
-            </label>
-            <label class="number-field">
-              <span>片段结束</span>
+            <div class="mobile-video-duration-control">
+              <div class="mobile-video-duration-head">
+                <span>视频时长（从 0 秒开始）</span>
+                <output>{{ mobileVideoDurationLabel }}</output>
+              </div>
               <input
-                v-model="clipEndSeconds"
-                type="number"
-                min="0"
+                class="mobile-video-duration-range"
+                :value="mobileVideoDurationValue"
+                type="range"
+                min="0.1"
+                :max="mobileVideoDuration"
                 step="0.1"
-                inputmode="decimal"
-                placeholder="到结尾"
+                aria-label="视频时长"
+                @input="updateMobileVideoDuration($event.target.value)"
               />
-              <small>秒</small>
-            </label>
+              <div class="range-scale" aria-hidden="true">
+                <span>0.1 秒</span>
+                <span>{{ mobileVideoDuration.toFixed(1) }} 秒</span>
+              </div>
+            </div>
           </div>
 
           <div class="mobile-frame-strip">
