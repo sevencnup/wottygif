@@ -1682,9 +1682,53 @@ onBeforeUnmount(() => {
 
         <section v-if="mode === 'video'" class="control-section settings-section video-settings-section">
           <div class="video-edit-panel">
-            <div class="crop-editor-actions">
-              <button type="button" @click="cancelCropChanges">取消修改</button>
-              <button class="crop-confirm-button" type="button" @click="confirmCrop">确认裁剪</button>
+            <div v-if="previewAsset?.kind === 'video'" class="crop-editor">
+              <div class="crop-editor-head">
+                <div>
+                  <strong>画面裁剪</strong>
+                  <span>{{ cropSummary }}</span>
+                </div>
+                <button type="button" @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()">
+                  {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
+                </button>
+              </div>
+              <div v-if="videoCropEditorOpen" class="crop-range-list">
+                <label>
+                  <span>裁剪宽度</span>
+                  <input
+                    v-model="cropWidthPercent"
+                    type="range"
+                    min="1"
+                    :max="cropWidthMax"
+                    step="1"
+                    @input="constrainCropFields"
+                  />
+                  <output>{{ cropBox.width }}%</output>
+                </label>
+                <label>
+                  <span>裁剪高度</span>
+                  <input
+                    v-model="cropHeightPercent"
+                    type="range"
+                    min="1"
+                    :max="cropHeightMax"
+                    step="1"
+                    @input="constrainCropFields"
+                  />
+                  <output>{{ cropBox.height }}%</output>
+                </label>
+              </div>
+              <div v-if="videoCropEditorOpen" class="crop-editor-actions">
+                <button type="button" @click="cancelCropChanges">取消修改</button>
+                <button
+                  class="crop-confirm-button"
+                  :class="{ confirmed: !cropIsDirty }"
+                  type="button"
+                  @click="confirmCrop"
+                >
+                  {{ cropIsDirty ? '确认裁剪' : '完成裁剪' }}
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -1869,7 +1913,10 @@ onBeforeUnmount(() => {
             <div
               v-else-if="previewAsset"
               class="media-crop-viewport desktop-media-crop-viewport video-preview-surface"
-              :class="{ cropped: hasAppliedPreviewCrop }"
+              :class="{
+                cropped: hasAppliedPreviewCrop,
+                'video-crop-stage': previewAsset.kind === 'video' && videoCropEditorOpen
+              }"
               :style="desktopMediaPreviewViewportStyle"
             >
               <img
@@ -1899,6 +1946,24 @@ onBeforeUnmount(() => {
                 @pause="stopVideoPlaybackState('desktop-preview')"
                 @ended="stopVideoPlaybackState('desktop-preview')"
               ></video>
+              <div
+                v-if="previewAsset.kind === 'video' && videoCropEditorOpen"
+                class="crop-box"
+                :style="cropBoxStyle"
+                role="application"
+                aria-label="视频画面裁剪区域"
+                @pointerdown.prevent="startCropInteraction($event, 'move')"
+              >
+                <span class="crop-thirds" aria-hidden="true"></span>
+                <span
+                  v-for="handle in CROP_HANDLES"
+                  :key="handle"
+                  class="crop-handle"
+                  :class="`handle-${handle}`"
+                  aria-hidden="true"
+                  @pointerdown.stop.prevent="startCropInteraction($event, handle)"
+                ></span>
+              </div>
             </div>
             <div v-else class="empty-preview">
               <p>上传后预览会显示在这里</p>
