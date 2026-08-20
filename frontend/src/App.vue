@@ -1692,32 +1692,6 @@ onBeforeUnmount(() => {
                   {{ videoCropEditorOpen ? '重置' : '裁剪画面' }}
                 </button>
               </div>
-              <div v-if="videoCropEditorOpen" class="crop-range-list">
-                <label>
-                  <span>裁剪宽度</span>
-                  <input
-                    v-model="cropWidthPercent"
-                    type="range"
-                    min="1"
-                    :max="cropWidthMax"
-                    step="1"
-                    @input="constrainCropFields"
-                  />
-                  <output>{{ cropBox.width }}%</output>
-                </label>
-                <label>
-                  <span>裁剪高度</span>
-                  <input
-                    v-model="cropHeightPercent"
-                    type="range"
-                    min="1"
-                    :max="cropHeightMax"
-                    step="1"
-                    @input="constrainCropFields"
-                  />
-                  <output>{{ cropBox.height }}%</output>
-                </label>
-              </div>
               <div v-if="videoCropEditorOpen" class="crop-editor-actions">
                 <button type="button" @click="cancelCropChanges">取消修改</button>
                 <button
@@ -2296,32 +2270,6 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <div class="mobile-asset-actions">
-              <button
-                type="button"
-                :disabled="selectedAssetIndex <= 0"
-                aria-label="素材前移"
-                title="前移"
-                @click="moveSelectedAsset(-1)"
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                :disabled="selectedAssetIndex < 0 || selectedAssetIndex >= assets.length - 1"
-                aria-label="素材后移"
-                title="后移"
-                @click="moveSelectedAsset(1)"
-              >
-                →
-              </button>
-              <button
-                v-if="mode === 'video'"
-                class="edit-command"
-                type="button"
-                @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()"
-              >
-                {{ videoCropEditorOpen ? '重置' : '裁剪画面' }}
-              </button>
               <button v-if="mode === 'video'" class="edit-command" type="button" @click="openMobileVideoEditor">
                 编辑画面
               </button>

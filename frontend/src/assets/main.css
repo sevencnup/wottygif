@@ -966,6 +966,7 @@ h1 {
   display: flex;
   min-height: 42px;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   padding: 4px 0;
   color: var(--ink-soft);
