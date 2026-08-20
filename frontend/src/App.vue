@@ -2292,14 +2292,6 @@ onBeforeUnmount(() => {
 
             <div class="mobile-asset-actions">
               <button
-                v-if="mode === 'video'"
-                class="edit-command"
-                type="button"
-                @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()"
-              >
-                {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
-              </button>
-              <button
                 type="button"
                 :disabled="selectedAssetIndex <= 0"
                 aria-label="素材前移"
@@ -2316,6 +2308,14 @@ onBeforeUnmount(() => {
                 @click="moveSelectedAsset(1)"
               >
                 →
+              </button>
+              <button
+                v-if="mode === 'video'"
+                class="edit-command"
+                type="button"
+                @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()"
+              >
+                {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
               </button>
               <button v-if="mode === 'video'" class="edit-command" type="button" @click="openMobileVideoEditor">
                 编辑画面
@@ -2743,3 +2743,4 @@ onBeforeUnmount(() => {
     />
   </main>
 </template>
+
