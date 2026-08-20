@@ -667,24 +667,37 @@ const togglePreviewPlayback = (video, surface) => {
   }
 }
 
-const toggleVideoPlayback = (video, surface) => {
+const resolveVideoElement = (video) => {
   if (!video) {
+    return null
+  }
+  if (typeof video === 'object' && 'value' in video) {
+    return video.value
+  }
+  return video
+}
+
+const toggleVideoPlayback = (video, surface) => {
+  const media = resolveVideoElement(video)
+  if (!media) {
     return
   }
 
-  if (video.paused) {
-    const bounds = clipBounds(video.duration)
-    if (video.currentTime < bounds.start || video.currentTime >= bounds.end - 0.04) {
-      video.currentTime = bounds.start
-      updateVideoProgress(video, surface)
+  if (media.paused) {
+    const bounds = clipBounds(media.duration)
+    if (media.currentTime < bounds.start || media.currentTime >= bounds.end - 0.04) {
+      media.currentTime = bounds.start
+      updateVideoProgress(media, surface)
     }
-    video.play().catch(() => {
-      setVideoPlaybackState(surface, false)
-    })
+    media
+      .play()
+      .then(() => setVideoPlaybackState(surface, true))
+      .catch(() => setVideoPlaybackState(surface, false))
     return
   }
 
-  video.pause()
+  media.pause()
+  setVideoPlaybackState(surface, false)
 }
 
 watch([imagePlaybackDelay, imagePreviewPlayable], ([, canPlay]) => {
@@ -2279,6 +2292,14 @@ onBeforeUnmount(() => {
 
             <div class="mobile-asset-actions">
               <button
+                v-if="mode === 'video'"
+                class="edit-command"
+                type="button"
+                @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()"
+              >
+                {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
+              </button>
+              <button
                 type="button"
                 :disabled="selectedAssetIndex <= 0"
                 aria-label="素材前移"
@@ -2379,49 +2400,6 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </section>
-
-          <section v-if="mode === 'video' && previewAsset?.kind === 'video'" class="mobile-section mobile-video-crop-section">
-            <h3>画面裁剪</h3>
-            <div class="crop-editor mobile-crop-editor">
-              <div class="crop-editor-head">
-                <div>
-                  <strong>裁剪区域</strong>
-                  <span>{{ cropSummary }}</span>
-                </div>
-                <button type="button" @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()">
-                  {{ videoCropEditorOpen ? '重置' : '重新裁剪' }}
-                </button>
-              </div>
-
-              <div v-if="videoCropEditorOpen" class="crop-range-list">
-                <label>
-                  <span>裁剪宽度</span>
-                  <input
-                    v-model="cropWidthPercent"
-                    type="range"
-                    min="1"
-                    :max="cropWidthMax"
-                    step="1"
-                    @input="constrainCropFields"
-                  />
-                  <output>{{ cropBox.width }}%</output>
-                </label>
-                <label>
-                  <span>裁剪高度</span>
-                  <input
-                    v-model="cropHeightPercent"
-                    type="range"
-                    min="1"
-                    :max="cropHeightMax"
-                    step="1"
-                    @input="constrainCropFields"
-                  />
-                  <output>{{ cropBox.height }}%</output>
-                </label>
-              </div>
-            </div>
-          </section>
-
           <section class="mobile-section">
             <h3>生成质量</h3>
             <label v-if="mode === 'multi_image'" class="mobile-setting-row mobile-fps-row">
