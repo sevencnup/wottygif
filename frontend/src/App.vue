@@ -2299,6 +2299,31 @@ onBeforeUnmount(() => {
                 +
               </button>
             </div>
+            <section v-if="mode === 'video'" class="mobile-section">
+              <h3>片段时间</h3>
+              <div class="mobile-time-grid">
+                <div class="mobile-video-duration-control">
+                  <div class="mobile-video-duration-head">
+                    <span>视频截取</span>
+                    <output>{{ mobileVideoDurationLabel }}</output>
+                  </div>
+                  <DualRangeSlider
+                    :min="0"
+                    :max="mobileVideoDuration"
+                    :start="videoStartValue"
+                    :end="videoSourceEndValue"
+                    @update:start="updateMobileVideoStart"
+                    @update:end="updateVideoClipEnd"
+                    @scrub="(v) => scrubVideoTo('mobile-source', v)"
+                  />
+                  <div class="range-scale" aria-hidden="true">
+                    <span>{{ formatPlaybackTime(videoStartValue) }}</span>
+                    <span>{{ formatPlaybackTime(videoSourceEndValue) }}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <div class="mobile-asset-actions">
               <button v-if="mode === 'video'" class="edit-command" type="button" @click="openMobileVideoEditor">
                 编辑画面
@@ -2383,6 +2408,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </section>
+
           <section class="mobile-section">
             <h3>生成质量</h3>
             <label v-if="mode === 'multi_image'" class="mobile-setting-row mobile-fps-row">
@@ -2415,31 +2441,6 @@ onBeforeUnmount(() => {
                 <span>{{ option.label.replace('质量', '') }}</span>
                 <strong>{{ option.detail }}</strong>
               </button>
-            </div>
-          </section>
-
-          <section v-if="mode === 'video'" class="mobile-section">
-            <h3>片段时间</h3>
-            <div class="mobile-time-grid">
-              <div class="mobile-video-duration-control">
-                <div class="mobile-video-duration-head">
-                  <span>视频截取</span>
-                  <output>{{ mobileVideoDurationLabel }}</output>
-                </div>
-                <DualRangeSlider
-                  :min="0"
-                  :max="mobileVideoDuration"
-                  :start="videoStartValue"
-                  :end="videoSourceEndValue"
-                  @update:start="updateMobileVideoStart"
-                  @update:end="updateVideoClipEnd"
-                  @scrub="(v) => scrubVideoTo('mobile-source', v)"
-                />
-                <div class="range-scale" aria-hidden="true">
-                  <span>{{ formatPlaybackTime(videoStartValue) }}</span>
-                  <span>{{ formatPlaybackTime(videoSourceEndValue) }}</span>
-                </div>
-              </div>
             </div>
           </section>
 
