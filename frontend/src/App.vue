@@ -281,26 +281,49 @@ const mobileVideoCanReachEnd = computed(() =>
   mobileVideoNativeDuration.value <= 0 || mobileVideoNativeDuration.value <= MAX_VIDEO_SECONDS
 )
 
-const mobileVideoDurationValue = computed(() => {
-  const current = Number(clipEndSeconds.value)
-  if (!Number.isFinite(current) || current <= 0) {
+// 源视频可选窗口的可达终点（clipEndSeconds 为空表示一直截到源结尾）
+const videoSourceEndValue = computed(() => {
+  const raw = Number(clipEndSeconds.value)
+  if (!Number.isFinite(raw) || raw <= 0) {
     return mobileVideoDuration.value
   }
-  return clamp(current, 0.1, mobileVideoDuration.value)
+  return clamp(raw, 0.1, mobileVideoDuration.value)
+})
+
+// 开始时间滑块
+const videoStartMax = computed(() => Math.max(0, mobileVideoDuration.value - 0.1))
+const videoStartValue = computed(() => clamp(Number(clipStartSeconds.value) || 0, 0, videoStartMax.value))
+
+// 视频时长（从开始时间起截取的总长度）
+const mobileVideoDurationValue = computed(() => {
+  const start = videoStartValue.value
+  return clamp(videoSourceEndValue.value - start, 0.1, mobileVideoDuration.value - start)
 })
 
 const mobileVideoDurationLabel = computed(() => {
-  const current = mobileVideoDurationValue.value
-  const maximum = mobileVideoDuration.value
-  return mobileVideoCanReachEnd.value && current >= maximum - 0.05 ? '到结尾' : `${current.toFixed(1)} 秒`
+  const length = mobileVideoDurationValue.value
+  const reachable = mobileVideoDuration.value - videoStartValue.value
+  return mobileVideoCanReachEnd.value && length >= reachable - 0.05 ? '到结尾' : `${length.toFixed(1)} 秒`
 })
 
-const updateMobileVideoDuration = (value) => {
-  const duration = clamp(Number(value) || 0.1, 0.1, mobileVideoDuration.value)
-  clipStartSeconds.value = '0'
-  clipEndSeconds.value = mobileVideoCanReachEnd.value && duration >= mobileVideoDuration.value - 0.05
+const updateMobileVideoStart = (value) => {
+  const start = clamp(Number(value) || 0, 0, videoStartMax.value)
+  const length = mobileVideoDurationValue.value
+  const end = start + length
+  clipStartSeconds.value = start.toFixed(1)
+  clipEndSeconds.value = mobileVideoCanReachEnd.value && end >= mobileVideoDuration.value - 0.05
     ? ''
-    : duration.toFixed(1)
+    : end.toFixed(1)
+}
+
+const updateMobileVideoDuration = (value) => {
+  const start = videoStartValue.value
+  const length = clamp(Number(value) || 0.1, 0.1, mobileVideoDuration.value - start)
+  const end = start + length
+  clipStartSeconds.value = start.toFixed(1)
+  clipEndSeconds.value = mobileVideoCanReachEnd.value && end >= mobileVideoDuration.value - 0.05
+    ? ''
+    : end.toFixed(1)
 }
 
 const syncMobileVideoDuration = (mediaDuration) => {
@@ -1660,7 +1683,21 @@ onBeforeUnmount(() => {
         <section v-if="mode === 'video'" class="control-section video-duration-section">
           <div v-if="previewAsset?.kind === 'video'" class="video-duration-control desktop-video-duration-control">
             <div class="video-duration-head">
-              <span>视频时长（从 0 秒开始）</span>
+              <span>开始时间</span>
+              <output>{{ formatPlaybackTime(videoStartValue) }}</output>
+            </div>
+            <input
+              class="video-duration-range"
+              :value="videoStartValue"
+              type="range"
+              min="0"
+              :max="videoStartMax"
+              step="0.1"
+              aria-label="开始时间"
+              @input="updateMobileVideoStart($event.target.value)"
+            />
+            <div class="video-duration-head">
+              <span>视频时长</span>
               <output>{{ mobileVideoDurationLabel }}</output>
             </div>
             <input
@@ -1668,7 +1705,7 @@ onBeforeUnmount(() => {
               :value="mobileVideoDurationValue"
               type="range"
               min="0.1"
-              :max="mobileVideoDuration"
+              :max="mobileVideoDuration - videoStartValue"
               step="0.1"
               aria-label="视频时长"
               @input="updateMobileVideoDuration($event.target.value)"
@@ -2393,7 +2430,21 @@ onBeforeUnmount(() => {
             <div class="mobile-time-grid">
               <div class="mobile-video-duration-control">
                 <div class="mobile-video-duration-head">
-                  <span>视频时长（从 0 秒开始）</span>
+                  <span>开始时间</span>
+                  <output>{{ formatPlaybackTime(videoStartValue) }}</output>
+                </div>
+                <input
+                  class="mobile-video-duration-range"
+                  :value="videoStartValue"
+                  type="range"
+                  min="0"
+                  :max="videoStartMax"
+                  step="0.1"
+                  aria-label="开始时间"
+                  @input="updateMobileVideoStart($event.target.value)"
+                />
+                <div class="mobile-video-duration-head">
+                  <span>视频时长</span>
                   <output>{{ mobileVideoDurationLabel }}</output>
                 </div>
                 <input
@@ -2401,7 +2452,7 @@ onBeforeUnmount(() => {
                   :value="mobileVideoDurationValue"
                   type="range"
                   min="0.1"
-                  :max="mobileVideoDuration"
+                  :max="mobileVideoDuration - videoStartValue"
                   step="0.1"
                   aria-label="视频时长"
                   @input="updateMobileVideoDuration($event.target.value)"
@@ -2518,7 +2569,21 @@ onBeforeUnmount(() => {
           >
             <div class="mobile-video-duration-control">
               <div class="mobile-video-duration-head">
-                <span>视频时长（从 0 秒开始）</span>
+                <span>开始时间</span>
+                <output>{{ formatPlaybackTime(videoStartValue) }}</output>
+              </div>
+              <input
+                class="mobile-video-duration-range"
+                :value="videoStartValue"
+                type="range"
+                min="0"
+                :max="videoStartMax"
+                step="0.1"
+                aria-label="开始时间"
+                @input="updateMobileVideoStart($event.target.value)"
+              />
+              <div class="mobile-video-duration-head">
+                <span>视频时长</span>
                 <output>{{ mobileVideoDurationLabel }}</output>
               </div>
               <input
@@ -2526,7 +2591,7 @@ onBeforeUnmount(() => {
                 :value="mobileVideoDurationValue"
                 type="range"
                 min="0.1"
-                :max="mobileVideoDuration"
+                :max="mobileVideoDuration - videoStartValue"
                 step="0.1"
                 aria-label="视频时长"
                 @input="updateMobileVideoDuration($event.target.value)"
