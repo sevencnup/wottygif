@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { CircleCheckBig, House, Maximize2, Pause, Play } from '@lucide/vue'
 import { createMediaJob, getHealth, listMediaJobs, resolveApiUrl } from './api/client.js'
+import DualRangeSlider from './components/DualRangeSlider.vue'
 
 const MODE_OPTIONS = [
   {
@@ -290,37 +291,26 @@ const videoSourceEndValue = computed(() => {
   return clamp(raw, 0.1, mobileVideoDuration.value)
 })
 
-// 开始时间滑块
+// 起点/终点滑块
 const videoStartMax = computed(() => Math.max(0, mobileVideoDuration.value - 0.1))
 const videoStartValue = computed(() => clamp(Number(clipStartSeconds.value) || 0, 0, videoStartMax.value))
 
-// 视频时长（从开始时间起截取的总长度）
-const mobileVideoDurationValue = computed(() => {
-  const start = videoStartValue.value
-  return clamp(videoSourceEndValue.value - start, 0.1, mobileVideoDuration.value - start)
-})
+// 当前截取长度（终点 - 起点）
+const videoClipLength = computed(() => videoSourceEndValue.value - videoStartValue.value)
 
 const mobileVideoDurationLabel = computed(() => {
-  const length = mobileVideoDurationValue.value
   const reachable = mobileVideoDuration.value - videoStartValue.value
-  return mobileVideoCanReachEnd.value && length >= reachable - 0.05 ? '到结尾' : `${length.toFixed(1)} 秒`
+  return mobileVideoCanReachEnd.value && videoClipLength.value >= reachable - 0.05
+    ? '到结尾'
+    : `${videoClipLength.value.toFixed(1)} 秒`
 })
 
 const updateMobileVideoStart = (value) => {
-  const start = clamp(Number(value) || 0, 0, videoStartMax.value)
-  const length = mobileVideoDurationValue.value
-  const end = start + length
-  clipStartSeconds.value = start.toFixed(1)
-  clipEndSeconds.value = mobileVideoCanReachEnd.value && end >= mobileVideoDuration.value - 0.05
-    ? ''
-    : end.toFixed(1)
+  clipStartSeconds.value = clamp(Number(value) || 0, 0, videoStartMax.value).toFixed(1)
 }
 
-const updateMobileVideoDuration = (value) => {
-  const start = videoStartValue.value
-  const length = clamp(Number(value) || 0.1, 0.1, mobileVideoDuration.value - start)
-  const end = start + length
-  clipStartSeconds.value = start.toFixed(1)
+const updateVideoClipEnd = (value) => {
+  const end = clamp(Number(value) || 0.1, videoStartValue.value + 0.1, mobileVideoDuration.value)
   clipEndSeconds.value = mobileVideoCanReachEnd.value && end >= mobileVideoDuration.value - 0.05
     ? ''
     : end.toFixed(1)
@@ -1683,36 +1673,20 @@ onBeforeUnmount(() => {
         <section v-if="mode === 'video'" class="control-section video-duration-section">
           <div v-if="previewAsset?.kind === 'video'" class="video-duration-control desktop-video-duration-control">
             <div class="video-duration-head">
-              <span>开始时间</span>
-              <output>{{ formatPlaybackTime(videoStartValue) }}</output>
-            </div>
-            <input
-              class="video-duration-range"
-              :value="videoStartValue"
-              type="range"
-              min="0"
-              :max="videoStartMax"
-              step="0.1"
-              aria-label="开始时间"
-              @input="updateMobileVideoStart($event.target.value)"
-            />
-            <div class="video-duration-head">
-              <span>视频时长</span>
+              <span>视频截取</span>
               <output>{{ mobileVideoDurationLabel }}</output>
             </div>
-            <input
-              class="video-duration-range"
-              :value="mobileVideoDurationValue"
-              type="range"
-              min="0.1"
-              :max="mobileVideoDuration - videoStartValue"
-              step="0.1"
-              aria-label="视频时长"
-              @input="updateMobileVideoDuration($event.target.value)"
+            <DualRangeSlider
+              :min="0"
+              :max="mobileVideoDuration"
+              :start="videoStartValue"
+              :end="videoSourceEndValue"
+              @update:start="updateMobileVideoStart"
+              @update:end="updateVideoClipEnd"
             />
             <div class="range-scale" aria-hidden="true">
-              <span>0.1 秒</span>
-              <span>{{ mobileVideoDuration.toFixed(1) }} 秒</span>
+              <span>{{ formatPlaybackTime(videoStartValue) }}</span>
+              <span>{{ formatPlaybackTime(videoSourceEndValue) }}</span>
             </div>
           </div>
         </section>
@@ -2430,36 +2404,20 @@ onBeforeUnmount(() => {
             <div class="mobile-time-grid">
               <div class="mobile-video-duration-control">
                 <div class="mobile-video-duration-head">
-                  <span>开始时间</span>
-                  <output>{{ formatPlaybackTime(videoStartValue) }}</output>
-                </div>
-                <input
-                  class="mobile-video-duration-range"
-                  :value="videoStartValue"
-                  type="range"
-                  min="0"
-                  :max="videoStartMax"
-                  step="0.1"
-                  aria-label="开始时间"
-                  @input="updateMobileVideoStart($event.target.value)"
-                />
-                <div class="mobile-video-duration-head">
-                  <span>视频时长</span>
+                  <span>视频截取</span>
                   <output>{{ mobileVideoDurationLabel }}</output>
                 </div>
-                <input
-                  class="mobile-video-duration-range"
-                  :value="mobileVideoDurationValue"
-                  type="range"
-                  min="0.1"
-                  :max="mobileVideoDuration - videoStartValue"
-                  step="0.1"
-                  aria-label="视频时长"
-                  @input="updateMobileVideoDuration($event.target.value)"
+                <DualRangeSlider
+                  :min="0"
+                  :max="mobileVideoDuration"
+                  :start="videoStartValue"
+                  :end="videoSourceEndValue"
+                  @update:start="updateMobileVideoStart"
+                  @update:end="updateVideoClipEnd"
                 />
                 <div class="range-scale" aria-hidden="true">
-                  <span>0.1 秒</span>
-                  <span>{{ mobileVideoDuration.toFixed(1) }} 秒</span>
+                  <span>{{ formatPlaybackTime(videoStartValue) }}</span>
+                  <span>{{ formatPlaybackTime(videoSourceEndValue) }}</span>
                 </div>
               </div>
             </div>
@@ -2569,36 +2527,20 @@ onBeforeUnmount(() => {
           >
             <div class="mobile-video-duration-control">
               <div class="mobile-video-duration-head">
-                <span>开始时间</span>
-                <output>{{ formatPlaybackTime(videoStartValue) }}</output>
-              </div>
-              <input
-                class="mobile-video-duration-range"
-                :value="videoStartValue"
-                type="range"
-                min="0"
-                :max="videoStartMax"
-                step="0.1"
-                aria-label="开始时间"
-                @input="updateMobileVideoStart($event.target.value)"
-              />
-              <div class="mobile-video-duration-head">
-                <span>视频时长</span>
+                <span>视频截取</span>
                 <output>{{ mobileVideoDurationLabel }}</output>
               </div>
-              <input
-                class="mobile-video-duration-range"
-                :value="mobileVideoDurationValue"
-                type="range"
-                min="0.1"
-                :max="mobileVideoDuration - videoStartValue"
-                step="0.1"
-                aria-label="视频时长"
-                @input="updateMobileVideoDuration($event.target.value)"
+              <DualRangeSlider
+                :min="0"
+                :max="mobileVideoDuration"
+                :start="videoStartValue"
+                :end="videoSourceEndValue"
+                @update:start="updateMobileVideoStart"
+                @update:end="updateVideoClipEnd"
               />
               <div class="range-scale" aria-hidden="true">
-                <span>0.1 秒</span>
-                <span>{{ mobileVideoDuration.toFixed(1) }} 秒</span>
+                <span>{{ formatPlaybackTime(videoStartValue) }}</span>
+                <span>{{ formatPlaybackTime(videoSourceEndValue) }}</span>
               </div>
             </div>
           </div>
