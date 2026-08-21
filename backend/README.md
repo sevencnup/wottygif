@@ -30,24 +30,16 @@ The unified launcher waits for `GET /api/health` before starting Vite and prints
 
 ## Docker
 
-From the repository root, build and run the backend on port `8699`:
+The repository Docker image contains the built frontend, Nginx, FastAPI, and FFmpeg. From the repository root, build and run the complete application on port `8699`:
 
 ```bash
-docker build -t wottygif-api .
+docker build -t wottygif .
 docker run --rm -p 8699:8699 \
-  -e WOTTYGIF_CORS_ORIGINS=https://your-frontend.example.com \
   -v wottygif-data:/app/data/results \
-  wottygif-api
+  wottygif
 ```
 
-The image includes FFmpeg and FFprobe. Set `WOTTYGIF_CORS_ORIGINS` to a comma-separated list of exact frontend origins when the API is deployed separately.
-
-
-Health check:
-
-```text
-GET http://127.0.0.1:8699/api/health
-```
+Open `http://127.0.0.1:8699` for the frontend. The API is available through the same port at `GET /api/health`. Nginx proxies `/api` to the internal FastAPI process. Set `WOTTYGIF_CORS_ORIGINS` only when the frontend is deployed separately from this combined image.
 
 Create job:
 

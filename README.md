@@ -53,33 +53,39 @@ pnpm --filter wottygif-frontend dev
 
 ## Docker Deployment
 
-The backend image is published automatically to GitHub Container Registry after each push to `main`:
+The published image contains both the Vue frontend and the FastAPI backend. Nginx serves the frontend and proxies `/api` requests to FastAPI, so one container is enough for the production deployment:
 
 ```text
 ghcr.io/sevencnup/wottygif:latest
+ghcr.io/sevencnup/wottygif:main
 ghcr.io/sevencnup/wottygif:<commit-sha>
 ```
 
-Run the backend on port `8699` with persistent result storage:
+Run the complete application on port `8699` with persistent result storage:
 
 ```bash
-docker pull ghcr.io/sevencnup/wottygif:latest
+docker pull ghcr.io/sevencnup/wottygif:main
 docker run -d \
-  --name wottygif-api \
+  --name wottygif \
   --restart unless-stopped \
   -p 8699:8699 \
-  -e WOTTYGIF_CORS_ORIGINS=https://your-frontend.example.com \
   -v wottygif-data:/app/data/results \
-  ghcr.io/sevencnup/wottygif:latest
+  ghcr.io/sevencnup/wottygif:main
 ```
 
-Check the service:
+Open the application at:
+
+```text
+http://你的服务器IP:8699
+```
+
+Check the API through the same port:
 
 ```bash
 curl http://127.0.0.1:8699/api/health
 ```
 
-Set the frontend build variable `VITE_API_BASE` to the deployed backend origin, for example `https://api.example.com`, and set `WOTTYGIF_CORS_ORIGINS` to the exact frontend origin without a trailing slash. The GHCR package may be private by default; make it public in the repository's Packages settings or authenticate Docker before pulling it.
+The frontend uses same-origin `/api` requests in the combined image, so `VITE_API_BASE` and `WOTTYGIF_CORS_ORIGINS` are not needed for this deployment. If the frontend is deployed separately, build it with `VITE_API_BASE` set to the backend origin and set `WOTTYGIF_CORS_ORIGINS` on the API container to the exact frontend origin. The GHCR package may be private by default; make it public in the repository's Packages settings or authenticate Docker before pulling it.
 
 ## API Notes
 
