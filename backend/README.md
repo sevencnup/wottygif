@@ -28,7 +28,20 @@ pnpm dev
 
 The unified launcher waits for `GET /api/health` before starting Vite and prints the backend error log if startup fails.
 
-## Endpoints
+## Docker
+
+From the repository root, build and run the backend on port `8699`:
+
+```bash
+docker build -t wottygif-api .
+docker run --rm -p 8699:8699 \
+  -e WOTTYGIF_CORS_ORIGINS=https://your-frontend.example.com \
+  -v wottygif-data:/app/data/results \
+  wottygif-api
+```
+
+The image includes FFmpeg and FFprobe. Set `WOTTYGIF_CORS_ORIGINS` to a comma-separated list of exact frontend origins when the API is deployed separately.
+
 
 Health check:
 

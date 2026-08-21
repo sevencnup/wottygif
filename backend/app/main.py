@@ -88,11 +88,18 @@ class MediaJob(BaseModel):
 
 app = FastAPI(title="WottyGIF API", version="0.3.27", lifespan=lifespan)
 
+configured_cors_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("WOTTYGIF_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:23689",
         "http://127.0.0.1:23689",
+        *configured_cors_origins,
     ],
     allow_origin_regex=r"http://(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}):23689",
     allow_credentials=True,

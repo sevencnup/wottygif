@@ -51,6 +51,36 @@ cd F:\1python\xiangmu
 pnpm --filter wottygif-frontend dev
 ```
 
+## Docker Deployment
+
+The backend image is published automatically to GitHub Container Registry after each push to `main`:
+
+```text
+ghcr.io/sevencnup/wottygif:latest
+ghcr.io/sevencnup/wottygif:<commit-sha>
+```
+
+Run the backend on port `8699` with persistent result storage:
+
+```bash
+docker pull ghcr.io/sevencnup/wottygif:latest
+docker run -d \
+  --name wottygif-api \
+  --restart unless-stopped \
+  -p 8699:8699 \
+  -e WOTTYGIF_CORS_ORIGINS=https://your-frontend.example.com \
+  -v wottygif-data:/app/data/results \
+  ghcr.io/sevencnup/wottygif:latest
+```
+
+Check the service:
+
+```bash
+curl http://127.0.0.1:8699/api/health
+```
+
+Set the frontend build variable `VITE_API_BASE` to the deployed backend origin, for example `https://api.example.com`, and set `WOTTYGIF_CORS_ORIGINS` to the exact frontend origin without a trailing slash. The GHCR package may be private by default; make it public in the repository's Packages settings or authenticate Docker before pulling it.
+
 ## API Notes
 
 `POST /api/media/jobs` accepts `multipart/form-data`:
