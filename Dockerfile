@@ -6,7 +6,8 @@ RUN corepack enable
 
 COPY package.json ./package.json
 COPY frontend/package.json ./frontend/package.json
-RUN pnpm --dir frontend install --no-frozen-lockfile
+RUN pnpm config set dangerouslyAllowAllBuilds true \
+    && pnpm --dir frontend install --no-frozen-lockfile
 
 COPY public ./public
 COPY frontend ./frontend
