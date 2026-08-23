@@ -143,11 +143,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .dual-range {
   position: relative;
-  height: 26px;
+  height: 28px;
   min-width: 0;
   touch-action: none;
   cursor: pointer;
   user-select: none;
+  display: flex;
+  align-items: center;
 }
 
 .dual-range::before {
@@ -159,7 +161,8 @@ onBeforeUnmount(() => {
   height: 6px;
   transform: translateY(-50%);
   border-radius: 999px;
-  background: var(--line, #d8dce3);
+  background: var(--line-muted, #e2e8f0);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .dual-range-fill {
@@ -168,8 +171,10 @@ onBeforeUnmount(() => {
   height: 6px;
   transform: translateY(-50%);
   border-radius: 999px;
-  background: var(--accent-strong, #3b82f6);
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
   pointer-events: none;
+  transition: background 0.2s ease;
 }
 
 .dual-range-handle {
@@ -178,27 +183,37 @@ onBeforeUnmount(() => {
   width: 20px;
   height: 20px;
   padding: 0;
-  border: 2px solid #ffffff;
-  border-radius: 999px;
-  background: var(--accent-strong, #3b82f6);
+  border: 2.5px solid #ffffff;
+  border-radius: 50%;
+  background: #2563eb;
   transform: translate(-50%, -50%);
   cursor: grab;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4), 0 1px 3px rgba(0, 0, 0, 0.12);
   touch-action: none;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, background-color 0.15s ease;
+  z-index: 2;
+}
+
+.dual-range-handle:hover {
+  transform: translate(-50%, -50%) scale(1.12);
+  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.55), 0 1px 4px rgba(0, 0, 0, 0.15);
+  background: #1d4ed8;
 }
 
 .dual-range-handle:active {
   cursor: grabbing;
-  transform: translate(-50%, -50%) scale(1.08);
+  transform: translate(-50%, -50%) scale(1.18);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.65), 0 0 0 4px rgba(37, 99, 235, 0.18);
+  background: #1e40af;
 }
 
 @media (pointer: coarse) {
   .dual-range {
-    height: 32px;
+    height: 36px;
   }
   .dual-range-handle {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
   }
 }
 </style>

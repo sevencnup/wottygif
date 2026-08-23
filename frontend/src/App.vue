@@ -1,6 +1,25 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { CircleCheckBig, House, Maximize2, Pause, Play } from '@lucide/vue'
+import {
+  CircleCheckBig,
+  House,
+  Maximize2,
+  Pause,
+  Play,
+  Sparkles,
+  Upload,
+  Plus,
+  X,
+  SlidersHorizontal,
+  Scissors,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Trash2,
+  Layers,
+  FolderDown,
+  Eye
+} from '@lucide/vue'
 import { createMediaJob, getHealth, listMediaJobs, resolveApiUrl } from './api/client.js'
 import DualRangeSlider from './components/DualRangeSlider.vue'
 
@@ -1624,7 +1643,10 @@ onBeforeUnmount(() => {
             <h1> wotty GIF 制作</h1>
             <p>轻松制作，快速生成</p>
           </div>
-          <span :class="['status', health]" role="status">{{ healthLabel }}</span>
+          <span :class="['status', health]" role="status">
+            <i class="status-dot" aria-hidden="true"></i>
+            {{ healthLabel }}
+          </span>
         </header>
 
         <section class="control-section">
@@ -1659,7 +1681,7 @@ onBeforeUnmount(() => {
             @keydown.enter.prevent="openPicker"
             @keydown.space.prevent="openPicker"
           >
-            <img class="upload-icon" src="/Upload.png" alt="" aria-hidden="true" />
+            <Upload class="upload-icon" :size="28" :stroke-width="2.1" aria-hidden="true" />
             <div class="paste-copy">
               <strong>点击上传图片</strong>
               <p>支持 JPG、PNG、WEBP；视频最长 30 秒</p>
@@ -1718,8 +1740,9 @@ onBeforeUnmount(() => {
                   <span>{{ cropSummary }}</span>
                 </div>
                 <button type="button" @click="videoCropEditorOpen ? resetCrop() : openVideoCropEditor()">
-                  {{ videoCropEditorOpen ? '重置' : '裁剪画面' }}
-                </button>
+                <Scissors :size="14" :stroke-width="2.2" aria-hidden="true" />
+                {{ videoCropEditorOpen ? '重置' : '裁剪画面' }}
+              </button>
               </div>
               <div v-if="videoCropEditorOpen" class="crop-editor-actions">
                 <button type="button" @click="cancelCropChanges">取消修改</button>
@@ -1862,10 +1885,11 @@ onBeforeUnmount(() => {
 
         <div class="submit-row">
           <button class="primary-button" type="submit" :disabled="isSubmitting">
-            <span aria-hidden="true">✦</span>
+            <Sparkles :size="16" :stroke-width="2.4" aria-hidden="true" />
             {{ isSubmitting ? '生成中...' : '生成 GIF' }}
           </button>
           <button class="ghost-button" type="button" @click.stop="resetAssets" :disabled="!assets.length">
+            <Trash2 :size="15" :stroke-width="2.2" aria-hidden="true" />
             清空素材
           </button>
         </div>
@@ -1997,9 +2021,18 @@ onBeforeUnmount(() => {
               <img v-if="asset.kind === 'image'" :src="asset.preview_url" :alt="asset.name" />
               <video v-else :src="asset.preview_url" muted playsinline :aria-label="asset.name"></video>
               <span>{{ index + 1 }}</span>
-              <button type="button" :aria-label="`移除 ${asset.name}`" @click="removeAsset(asset.id)">×</button>
+              <button
+                type="button"
+                :aria-label="`移除 ${asset.name}`"
+                title="移除素材"
+                @click="removeAsset(asset.id)"
+              >
+                <X :size="14" :stroke-width="2.5" aria-hidden="true" />
+              </button>
             </article>
-            <button class="add-frame" type="button" aria-label="继续添加素材" @click="openPicker">+</button>
+            <button class="add-frame" type="button" aria-label="继续添加素材" title="继续添加素材" @click="openPicker">
+              <Plus :size="22" :stroke-width="2.2" aria-hidden="true" />
+            </button>
           </div>
         </div>
       </section>
@@ -2039,10 +2072,11 @@ onBeforeUnmount(() => {
                 class="icon-button"
                 type="button"
                 aria-label="预览成品"
+                title="预览成品"
                 :disabled="job.status !== 'completed' || !job.result_url"
                 @click="openJobPreview(job)"
               >
-                <span aria-hidden="true">▶</span>
+                <Eye :size="16" :stroke-width="2.2" aria-hidden="true" />
               </button>
               <a
                 v-if="job.status === 'completed' && job.result_url"
@@ -2050,8 +2084,9 @@ onBeforeUnmount(() => {
                 :href="resolveApiUrl(job.result_url)"
                 :download="job.result_name"
                 aria-label="下载 GIF"
+                title="下载 GIF"
               >
-                <span aria-hidden="true">⇩</span>
+                <Download :size="16" :stroke-width="2.2" aria-hidden="true" />
               </a>
               <span v-else class="job-status" :class="job.status">{{ formatJobStatus(job.status) }}</span>
             </div>
@@ -2092,7 +2127,7 @@ onBeforeUnmount(() => {
                   <strong>{{ option.label }}</strong>
                   <small>{{ option.hint }}</small>
                 </span>
-                <span class="mobile-chevron" aria-hidden="true">›</span>
+                <ChevronRight class="mobile-chevron" :size="21" :stroke-width="2.3" aria-hidden="true" />
               </button>
             </div>
           </section>
@@ -2119,11 +2154,11 @@ onBeforeUnmount(() => {
       <section v-else-if="mobilePage === 'configure'" class="mobile-page">
         <header class="mobile-topbar">
           <button class="nav-icon" type="button" aria-label="返回首页" @click="goMobileBack('home')">
-            <span aria-hidden="true">‹</span>
+            <ChevronLeft :size="20" :stroke-width="2.3" aria-hidden="true" />
           </button>
           <h2>{{ modeMeta.label }}</h2>
           <button class="nav-icon" type="button" aria-label="打开预览" @click="openPreviewPage">
-            <span aria-hidden="true">◌</span>
+            <Eye :size="19" :stroke-width="2.2" aria-hidden="true" />
           </button>
         </header>
 
@@ -2138,7 +2173,7 @@ onBeforeUnmount(() => {
             @keydown.enter.prevent="openPicker"
             @keydown.space.prevent="openPicker"
           >
-            <img class="upload-icon" src="/Upload.png" alt="" aria-hidden="true" />
+            <Upload class="upload-icon" :size="28" :stroke-width="2.1" aria-hidden="true" />
             <strong>
               {{ assets.length ? '继续添加素材' : mode === 'video' ? '点击上传视频' : '点击上传图片' }}
             </strong>
@@ -2166,7 +2201,7 @@ onBeforeUnmount(() => {
                 title="移除素材"
                 @click="removeAsset(previewAsset.id)"
               >
-                ×
+                <X :size="17" :stroke-width="2.5" aria-hidden="true" />
               </button>
             </header>
 
@@ -2469,11 +2504,11 @@ onBeforeUnmount(() => {
       <section v-else-if="mobilePage === 'preview'" class="mobile-page">
         <header class="mobile-topbar">
           <button class="nav-icon" type="button" aria-label="返回参数页" @click="goMobileBack('configure')">
-            <span aria-hidden="true">‹</span>
+            <ChevronLeft :size="20" :stroke-width="2.3" aria-hidden="true" />
           </button>
           <h2>制作预览</h2>
           <button class="nav-icon" type="button" aria-label="打开已完成" @click="openJobsPage">
-            <span aria-hidden="true">◔</span>
+            <CircleCheckBig :size="19" :stroke-width="2.2" aria-hidden="true" />
           </button>
         </header>
 
@@ -2572,12 +2607,14 @@ onBeforeUnmount(() => {
               <video v-else :src="asset.preview_url" muted playsinline :aria-label="asset.name"></video>
               <span>{{ index + 1 }}</span>
             </article>
-            <button class="add-frame" type="button" aria-label="继续添加素材" @click="openPicker">+</button>
+            <button class="add-frame" type="button" aria-label="继续添加素材" title="继续添加素材" @click="openPicker">
+              <Plus :size="22" :stroke-width="2.2" aria-hidden="true" />
+            </button>
           </div>
 
           <div class="mobile-tool-row">
             <button class="mobile-tool" type="button" @click="openConfigurePage">
-              <span aria-hidden="true">▥</span>
+              <span aria-hidden="true"><Layers :size="17" :stroke-width="2.2" /></span>
               <small>调整素材</small>
             </button>
             <button
@@ -2585,7 +2622,7 @@ onBeforeUnmount(() => {
               type="button"
               @click="mode === 'video' ? openMobileVideoEditor() : openConfigurePage()"
             >
-              <span aria-hidden="true">◔</span>
+              <span aria-hidden="true"><Scissors :size="17" :stroke-width="2.2" /></span>
               <small>{{ mode === 'video' ? '截取片段' : '预览素材' }}</small>
             </button>
             <button
@@ -2593,7 +2630,7 @@ onBeforeUnmount(() => {
               type="button"
               @click="mode === 'video' ? openMobileVideoEditor() : openConfigurePage()"
             >
-              <span aria-hidden="true">⌗</span>
+              <span aria-hidden="true"><SlidersHorizontal :size="17" :stroke-width="2.2" /></span>
               <small>{{ mode === 'video' ? '调整裁剪' : '修改质量' }}</small>
             </button>
           </div>
@@ -2612,10 +2649,11 @@ onBeforeUnmount(() => {
       <section v-else-if="mobilePage === 'jobs'" class="mobile-page">
         <header class="mobile-topbar">
           <button class="nav-icon" type="button" aria-label="返回首页" @click="goMobileBack('home')">
-            <span aria-hidden="true">‹</span>
+            <ChevronLeft :size="20" :stroke-width="2.3" aria-hidden="true" />
           </button>
           <h2>已完成</h2>
           <button class="header-action" type="button" :disabled="!completedJobs.length" @click="downloadCompletedJobs">
+            <FolderDown :size="15" :stroke-width="2.2" aria-hidden="true" />
             打包
           </button>
         </header>
@@ -2636,7 +2674,7 @@ onBeforeUnmount(() => {
                 <small>{{ formatJobMode(job.mode) }} · 质量 {{ job.quality }}</small>
                 <small v-if="job.error_message" class="job-error">{{ job.error_message }}</small>
               </span>
-              <span class="mobile-chevron" aria-hidden="true">›</span>
+              <ChevronRight class="mobile-chevron" :size="21" :stroke-width="2.3" aria-hidden="true" />
             </button>
           </div>
           <p v-else class="empty-jobs">暂无任务</p>
@@ -2657,7 +2695,7 @@ onBeforeUnmount(() => {
       <section v-else-if="mobilePage === 'detail'" class="mobile-page">
         <header class="mobile-topbar">
           <button class="nav-icon" type="button" aria-label="返回已完成" @click="closeJobDetail">
-            <span aria-hidden="true">‹</span>
+            <ChevronLeft :size="20" :stroke-width="2.3" aria-hidden="true" />
           </button>
           <h2>预览</h2>
           <span class="topbar-spacer"></span>
@@ -2688,7 +2726,7 @@ onBeforeUnmount(() => {
               :disabled="selectedJob.status !== 'completed' || !selectedJob.result_url"
               @click="openJobPreview(selectedJob)"
             >
-              <span aria-hidden="true">▶</span>
+              <Play :size="20" :stroke-width="2.2" aria-hidden="true" />
               <small>播放</small>
             </button>
             <a
@@ -2697,7 +2735,7 @@ onBeforeUnmount(() => {
               :href="resolveApiUrl(selectedJob.result_url)"
               :download="selectedJob.result_name"
             >
-              <span aria-hidden="true">⇩</span>
+              <Download :size="20" :stroke-width="2.2" aria-hidden="true" />
               <small>下载</small>
             </a>
           </div>
