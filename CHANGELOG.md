@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.33 - 2026-08-31
+
+- 完善服务器 Docker 部署与域名接入说明。
+
 ## 0.3.32 - 2026-08-19
 
 - Changed the frontend dev server port from 5173 to 2622 across the Vite config, backend CORS, dev script, and README.
