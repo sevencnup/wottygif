@@ -946,7 +946,12 @@ const scrollMobileMessageIntoView = async () => {
     return
   }
   await nextTick()
-  document.querySelector('.mobile-page-body')?.scrollTo({ top: document.querySelector('.mobile-page-body').scrollHeight, behavior: 'smooth' })
+  const msg = document.querySelector('.mobile-page-body .message.success')
+  if (msg) {
+    msg.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  } else {
+    document.querySelector('.mobile-page-body')?.scrollTo({ top: document.querySelector('.mobile-page-body').scrollHeight, behavior: 'smooth' })
+  }
 }
 
 const moveAfterImageCrop = () => {
