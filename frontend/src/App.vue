@@ -2610,15 +2610,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="mobile-frame-strip">
+          <div v-if="mode === 'multi_image' && previewFrames.length > 1" class="mobile-frame-strip">
             <article v-for="(asset, index) in previewFrames" :key="asset.id" class="frame-card">
               <img v-if="asset.kind === 'image'" :src="asset.preview_url" :alt="asset.name" />
               <video v-else :src="asset.preview_url" muted playsinline :aria-label="asset.name"></video>
               <span>{{ index + 1 }}</span>
             </article>
-            <button class="add-frame" type="button" aria-label="继续添加素材" title="继续添加素材" @click="openPicker">
-              <Plus :size="22" :stroke-width="2.2" aria-hidden="true" />
-            </button>
           </div>
 
           <p v-if="errorMessage" class="message error" role="alert">{{ errorMessage }}</p>

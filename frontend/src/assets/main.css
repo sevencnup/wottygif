@@ -1458,6 +1458,12 @@ h1 {
   padding-top: 12px;
 }
 
+.mobile-page-body .message {
+  position: relative;
+  z-index: 2;
+  margin: 10px 4px 6px;
+}
+
 .mobile-section {
   gap: 5px;
   background: #ffffff;
@@ -1807,7 +1813,7 @@ h1 {
 
 .mobile-image-crop-editor {
   width: 100%;
-  margin-bottom: -18px;
+  margin-bottom: 4px;
   padding-bottom: 0;
   background: #ffffff;
 }
