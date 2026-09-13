@@ -900,8 +900,7 @@ h1 {
 
 .app-footer a {
   color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
   transition: color 0.15s ease;
 }
 
