@@ -59,8 +59,10 @@ const FPS_MAX = 30
 const MAX_VIDEO_SECONDS = 30
 const COPYRIGHT_LABEL = '© 2026 WottyGIF 版权所有'
 const RESULT_RETENTION_LABEL = '生成文件将在完成后 1 小时自动删除'
-const OPEN_SOURCE_LABEL = '开源地址：rungif.wotty.app'
-const OPEN_SOURCE_URL = 'https://rungif.wotty.app'
+const OPEN_SOURCE_LABEL = '开源地址：GitHub'
+const OPEN_SOURCE_URL = 'https://github.com/sevencnup/wottygif'
+const PROJECT_SITE_LABEL = '项目网站：gif.wotty.app'
+const PROJECT_SITE_URL = 'https://gif.wotty.app'
 const defaultFpsForQuality = (qualityValue) => ({ 1: 6, 2: 8, 3: 10, 4: 12, 5: 15 })[qualityValue] ?? 10
 
 const LOOP_OPTIONS = [
@@ -1908,6 +1910,7 @@ onBeforeUnmount(() => {
           <span>{{ COPYRIGHT_LABEL }}</span>
           <span>{{ RESULT_RETENTION_LABEL }}</span>
           <a :href="OPEN_SOURCE_URL" target="_blank" rel="noopener noreferrer">{{ OPEN_SOURCE_LABEL }}</a>
+          <a :href="PROJECT_SITE_URL" target="_blank" rel="noopener noreferrer">{{ PROJECT_SITE_LABEL }}</a>
         </footer>
       </form>
 
@@ -2146,6 +2149,7 @@ onBeforeUnmount(() => {
             <span>{{ COPYRIGHT_LABEL }}</span>
             <span>{{ RESULT_RETENTION_LABEL }}</span>
             <a :href="OPEN_SOURCE_URL" target="_blank" rel="noopener noreferrer">{{ OPEN_SOURCE_LABEL }}</a>
+            <a :href="PROJECT_SITE_URL" target="_blank" rel="noopener noreferrer">{{ PROJECT_SITE_LABEL }}</a>
           </footer>
         </div>
 
