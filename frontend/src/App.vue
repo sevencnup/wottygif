@@ -967,6 +967,10 @@ const moveAfterImageCrop = () => {
   } else {
     imageCropEditorOpen.value = false
     queueMessage.value = '全部图片裁剪已处理，可以进入预览。'
+    if (isMobileViewport() && mobilePage.value === 'configure') {
+      openPreviewPage()
+      return
+    }
     scrollMobileMessageIntoView()
   }
 }
@@ -2562,7 +2566,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="mobile-preview-toolbar video-preview-surface">
+          <div v-if="mode === 'video' || (mode === 'multi_image' && assets.length > 1)" class="mobile-preview-toolbar video-preview-surface">
             <button
               class="nav-icon compact"
               type="button"
@@ -2617,31 +2621,31 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <div class="mobile-tool-row">
-            <button class="mobile-tool" type="button" @click="openConfigurePage">
-              <span aria-hidden="true"><Layers :size="17" :stroke-width="2.2" /></span>
-              <small>调整素材</small>
-            </button>
-            <button
-              class="mobile-tool"
-              type="button"
-              @click="mode === 'video' ? openMobileVideoEditor() : openConfigurePage()"
-            >
-              <span aria-hidden="true"><Scissors :size="17" :stroke-width="2.2" /></span>
-              <small>{{ mode === 'video' ? '截取片段' : '预览素材' }}</small>
-            </button>
-            <button
-              class="mobile-tool"
-              type="button"
-              @click="mode === 'video' ? openMobileVideoEditor() : openConfigurePage()"
-            >
-              <span aria-hidden="true"><SlidersHorizontal :size="17" :stroke-width="2.2" /></span>
-              <small>{{ mode === 'video' ? '调整裁剪' : '修改质量' }}</small>
-            </button>
-          </div>
-
           <p v-if="errorMessage" class="message error" role="alert">{{ errorMessage }}</p>
           <p v-if="queueMessage" class="message success" aria-live="polite">{{ queueMessage }}</p>
+        </div>
+
+        <div class="mobile-tool-row">
+          <button class="mobile-tool" type="button" @click="openConfigurePage">
+            <span aria-hidden="true"><Layers :size="17" :stroke-width="2.2" /></span>
+            <small>调整素材</small>
+          </button>
+          <button
+            class="mobile-tool"
+            type="button"
+            @click="mode === 'video' ? openMobileVideoEditor() : openConfigurePage()"
+          >
+            <span aria-hidden="true"><Scissors :size="17" :stroke-width="2.2" /></span>
+            <small>{{ mode === 'video' ? '截取片段' : '预览素材' }}</small>
+          </button>
+          <button
+            class="mobile-tool"
+            type="button"
+            @click="mode === 'video' ? openMobileVideoEditor() : openConfigurePage()"
+          >
+            <span aria-hidden="true"><SlidersHorizontal :size="17" :stroke-width="2.2" /></span>
+            <small>{{ mode === 'video' ? '调整裁剪' : '修改质量' }}</small>
+          </button>
         </div>
 
         <div class="mobile-bottom-cta single">
