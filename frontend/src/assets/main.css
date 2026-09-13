@@ -3435,4 +3435,19 @@ body {
     background: rgba(255, 255, 255, 0.88);
     backdrop-filter: blur(18px);
   }
+
+  .mobile-source-stage,
+  .mobile-preview-stage {
+    margin-bottom: 6px;
+  }
+
+  .mobile-page-body .message,
+  .mobile-page .message {
+    position: relative !important;
+    z-index: 5 !important;
+    margin: 14px 6px 8px !important;
+    padding: 8px 12px !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  }
 }
