@@ -1479,8 +1479,7 @@ h1 {
 .mobile-detail-stage,
 .mobile-detail-meta,
 .mobile-summary,
-.mobile-preview-toolbar,
-.mobile-tool-row {
+.mobile-preview-toolbar {
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(16px);
@@ -2077,6 +2076,9 @@ h1 {
   gap: 2px;
   min-width: 0;
   text-align: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .mobile-tool span {
@@ -2129,6 +2131,9 @@ h1 {
   flex-direction: column;
   gap: 4px;
   border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid rgba(219, 227, 238, 0.72);
+  box-shadow: 0 5px 14px rgba(42, 57, 80, 0.05);
 }
 
 .detail-action small {
@@ -2331,8 +2336,8 @@ h1 {
   }
 
   .message {
-    max-height: 34px;
-    overflow: hidden;
+    max-height: none;
+    overflow: visible;
     margin: 6px 14px 0;
     padding: 5px 8px;
   }
@@ -2567,8 +2572,8 @@ h1 {
   }
 
   .message {
-    max-height: 42px;
-    overflow: auto;
+    max-height: none;
+    overflow: visible;
     margin: 6px 10px 0;
     padding: 6px 8px;
   }
@@ -3317,7 +3322,6 @@ body {
 .mobile-setting-group,
 .mobile-summary,
 .mobile-preview-toolbar,
-.mobile-tool-row,
 .mobile-job-card,
 .mobile-detail-stage,
 .mobile-detail-meta {
