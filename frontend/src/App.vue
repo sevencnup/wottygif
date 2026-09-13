@@ -2493,7 +2493,6 @@ onBeforeUnmount(() => {
           </div>
 
           <p v-if="errorMessage" class="message error" role="alert">{{ errorMessage }}</p>
-          <p v-if="queueMessage" class="message success" aria-live="polite">{{ queueMessage }}</p>
         </div>
 
         <div class="mobile-bottom-cta">
@@ -2619,7 +2618,6 @@ onBeforeUnmount(() => {
           </div>
 
           <p v-if="errorMessage" class="message error" role="alert">{{ errorMessage }}</p>
-          <p v-if="queueMessage" class="message success" aria-live="polite">{{ queueMessage }}</p>
         </div>
 
         <div class="mobile-tool-row">
